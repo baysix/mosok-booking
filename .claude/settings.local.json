@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dir:*)",
+      "Bash(pnpm create:*)",
+      "Bash(npx create-next-app@latest . --typescript --tailwind --app --src-dir --import-alias \"@/*\" --use-npm --skip-install)",
+      "Bash(npm install:*)",
+      "Bash(npm run dev:*)",
+      "Bash(timeout 5 tail:*)",
+      "Bash(npx shadcn@latest add:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git stash:*)",
+      "Bash(git push:*)",
+      "Bash(where:*)",
+      "Bash(node -e:*)",
+      "Bash(/tmp/test_short.js:*)",
+      "Bash(node:*)",
+      "Bash(/tmp/gen_notion.js:*)"
+    ]
+  }
+}

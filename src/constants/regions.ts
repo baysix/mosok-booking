@@ -1,0 +1,30 @@
+export const REGIONS = [
+  { value: '서울특별시', label: '서울특별시' },
+  { value: '부산광역시', label: '부산광역시' },
+  { value: '대구광역시', label: '대구광역시' },
+  { value: '인천광역시', label: '인천광역시' },
+  { value: '광주광역시', label: '광주광역시' },
+  { value: '대전광역시', label: '대전광역시' },
+  { value: '울산광역시', label: '울산광역시' },
+  { value: '세종특별자치시', label: '세종특별자치시' },
+  { value: '경기도', label: '경기도' },
+  { value: '강원특별자치도', label: '강원특별자치도' },
+  { value: '충청북도', label: '충청북도' },
+  { value: '충청남도', label: '충청남도' },
+  { value: '전북특별자치도', label: '전북특별자치도' },
+  { value: '전라남도', label: '전라남도' },
+  { value: '경상북도', label: '경상북도' },
+  { value: '경상남도', label: '경상남도' },
+  { value: '제주특별자치도', label: '제주특별자치도' },
+] as const;
+
+export const SPECIALTIES = [
+  { value: '굿', label: '굿' },
+  { value: '점술', label: '점술' },
+  { value: '사주', label: '사주' },
+  { value: '타로', label: '타로' },
+  { value: '궁합', label: '궁합' },
+  { value: '작명', label: '작명' },
+  { value: '풍수', label: '풍수' },
+  { value: '해몽', label: '해몽' },
+] as const;
