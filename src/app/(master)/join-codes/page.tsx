@@ -249,8 +249,14 @@ function CreateCodeModal({ onClose, onSubmit }: CreateCodeModalProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // 모달 열릴 때 배경 스크롤 차단
+  useEffect(() => {
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = ''; };
+  }, []);
+
+  const handleSubmit = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     setError('');
     setIsSubmitting(true);
 
@@ -272,24 +278,28 @@ function CreateCodeModal({ onClose, onSubmit }: CreateCodeModalProps) {
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-      <div className="relative w-full sm:max-w-md bg-white rounded-t-2xl sm:rounded-2xl max-h-[90vh] overflow-y-auto animate-in slide-in-from-bottom duration-300">
-        <div className="sm:hidden flex justify-center pt-3">
-          <div className="w-10 h-1 rounded-full bg-gray-300" />
-        </div>
-
-        <div className="flex items-center justify-between p-4 pb-2">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center">
-              <Ticket className="w-4 h-4 text-indigo-500" />
-            </div>
-            <h3 className="text-base font-bold text-gray-900">초대코드 생성</h3>
+      <div className="relative w-full sm:max-w-md bg-white rounded-t-2xl sm:rounded-2xl max-h-[90vh] flex flex-col animate-in slide-in-from-bottom duration-300">
+        {/* 고정 헤더 */}
+        <div className="flex-shrink-0">
+          <div className="sm:hidden flex justify-center pt-3">
+            <div className="w-10 h-1 rounded-full bg-gray-300" />
           </div>
-          <button onClick={onClose} className="p-2 rounded-lg hover:bg-gray-100 transition-colors">
-            <X className="w-5 h-5 text-gray-400" />
-          </button>
+
+          <div className="flex items-center justify-between p-4 pb-2">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center">
+                <Ticket className="w-4 h-4 text-indigo-500" />
+              </div>
+              <h3 className="text-base font-bold text-gray-900">초대코드 생성</h3>
+            </div>
+            <button onClick={onClose} className="p-2 rounded-lg hover:bg-gray-100 transition-colors">
+              <X className="w-5 h-5 text-gray-400" />
+            </button>
+          </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-4 pt-2 space-y-4">
+        {/* 스크롤 가능한 폼 영역 */}
+        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-4 pt-2 space-y-4">
           {error && (
             <div className="px-3 py-2 rounded-lg bg-red-50 text-sm text-red-600">{error}</div>
           )}
@@ -335,8 +345,14 @@ function CreateCodeModal({ onClose, onSubmit }: CreateCodeModalProps) {
             <p className="text-xs text-gray-400 mt-1">비워두면 만료 없이 사용 가능합니다</p>
           </div>
 
+          <div className="pb-2" />
+        </form>
+
+        {/* 하단 고정 버튼 */}
+        <div className="flex-shrink-0 p-4 pt-2 border-t border-gray-100">
           <button
-            type="submit"
+            type="button"
+            onClick={handleSubmit}
             disabled={isSubmitting}
             className="w-full h-12 rounded-xl bg-indigo-500 text-white text-sm font-semibold hover:bg-indigo-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
@@ -352,7 +368,7 @@ function CreateCodeModal({ onClose, onSubmit }: CreateCodeModalProps) {
               </>
             )}
           </button>
-        </form>
+        </div>
       </div>
     </div>
   );

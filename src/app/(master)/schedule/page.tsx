@@ -64,6 +64,14 @@ export default function MasterSchedulePage() {
   const [offDayReason, setOffDayReason] = useState('');
   const [addingOffDay, setAddingOffDay] = useState(false);
 
+  // 모달 열릴 때 배경 스크롤 차단
+  useEffect(() => {
+    if (offDayModal) {
+      document.body.style.overflow = 'hidden';
+      return () => { document.body.style.overflow = ''; };
+    }
+  }, [offDayModal]);
+
   // Auth guard
   useEffect(() => {
     if (!isLoading && (!user || user.role !== 'master')) {

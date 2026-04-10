@@ -49,6 +49,14 @@ export default function MasterProfilePage() {
   const [images, setImages] = useState<string[]>([]);
   const [showPostcode, setShowPostcode] = useState(false);
 
+  // 모달 열릴 때 배경 스크롤 차단
+  useEffect(() => {
+    if (showPostcode) {
+      document.body.style.overflow = 'hidden';
+      return () => { document.body.style.overflow = ''; };
+    }
+  }, [showPostcode]);
+
   // 카카오맵 SDK 로드 (Geocoder 사용 위해)
   useKakaoLoader({ appkey: process.env.NEXT_PUBLIC_KAKAO_MAP_APP_KEY || '', libraries: ['services'] });
 
