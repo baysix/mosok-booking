@@ -258,7 +258,7 @@ export default function MasterSchedulePage() {
   return (
     <div className="min-h-screen bg-white">
       <div className="container mx-auto px-4 py-6 max-w-3xl">
-        <h1 className="text-2xl font-bold text-gray-900 mb-1">일정 관리</h1>
+        <h1 className="text-2xl font-bold text-gray-900 mb-1">영업시간 설정</h1>
         <p className="text-sm text-gray-500 mb-5">상담 가능 시간과 휴무일을 설정하세요</p>
 
         {/* Message toast */}

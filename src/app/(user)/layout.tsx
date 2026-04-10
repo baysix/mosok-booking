@@ -22,13 +22,15 @@ export default function UserLayout({
             <span className="text-lg font-extrabold text-primary">무속</span>
           </Link>
           {user && (
-            <button
-              onClick={logout}
-              className="flex items-center gap-1.5 text-gray-400 hover:text-gray-600 transition-colors"
-            >
-              <LogOut className="w-4 h-4" />
-              <span className="text-xs">로그아웃</span>
-            </button>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-medium text-gray-500">{user.fullName}</span>
+              <button
+                onClick={logout}
+                className="p-2 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-50 transition-colors"
+              >
+                <LogOut className="w-5 h-5" />
+              </button>
+            </div>
           )}
         </div>
       </header>

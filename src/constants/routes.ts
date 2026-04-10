@@ -17,10 +17,12 @@ export const ROUTES = {
 
   // Master (무속인)
   MASTER_DASHBOARD: '/dashboard',
+  MASTER_CALENDAR: '/calendar',
   MASTER_RESERVATIONS: '/master-reservations',
   MASTER_SCHEDULE: '/schedule',
   MASTER_MEMBERS: '/members',
   MASTER_JOIN_CODES: '/join-codes',
+  MASTER_MYPAGE: '/master-mypage',
   MASTER_PROFILE: '/master-profile',
   MASTER_CHAT: '/master-chat',
   MASTER_CHAT_ROOM: (roomId: string) => `/master-chat/${roomId}`,

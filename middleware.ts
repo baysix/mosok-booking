@@ -9,11 +9,13 @@ const protectedRoutes = [
   '/profile',
   '/chat',
   '/dashboard',
+  '/calendar',
   '/master-reservations',
   '/schedule',
   '/members',
   '/join-codes',
   '/master-profile',
+  '/master-mypage',
   '/master-chat',
   '/masters/approval',
   '/join',
@@ -25,11 +27,13 @@ const authRoutes = ['/login', '/signup'];
 // master 전용 라우트
 const masterRoutes = [
   '/dashboard',
+  '/calendar',
   '/master-reservations',
   '/schedule',
   '/members',
   '/join-codes',
   '/master-profile',
+  '/master-mypage',
   '/master-chat',
 ];
 

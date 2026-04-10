@@ -174,6 +174,13 @@ export function Header() {
                     대시보드
                   </Link>
                   <Link
+                    href={ROUTES.MASTER_CALENDAR}
+                    className="px-4 py-3 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                  >
+                    예약 캘린더
+                  </Link>
+                  <Link
                     href={ROUTES.MASTER_RESERVATIONS}
                     className="px-4 py-3 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
                     onClick={() => setIsMobileMenuOpen(false)}
@@ -185,7 +192,7 @@ export function Header() {
                     className="px-4 py-3 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
                     onClick={() => setIsMobileMenuOpen(false)}
                   >
-                    일정관리
+                    영업시간 설정
                   </Link>
                   <Link
                     href={ROUTES.MASTER_MEMBERS}

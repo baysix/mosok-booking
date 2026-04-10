@@ -9,6 +9,7 @@ import { ROUTES } from '@/constants/routes';
 import {
     LayoutDashboard,
     Calendar,
+    CalendarDays,
     MessageSquare,
     User,
     LogOut,
@@ -39,8 +40,9 @@ export function Sidebar({ className, onClose }: SidebarProps) {
 
     const masterLinks = [
         { href: ROUTES.MASTER_DASHBOARD, label: '대시보드', icon: LayoutDashboard },
+        { href: ROUTES.MASTER_CALENDAR, label: '예약 캘린더', icon: CalendarDays },
         { href: ROUTES.MASTER_RESERVATIONS, label: '예약 관리', icon: Calendar },
-        { href: ROUTES.MASTER_SCHEDULE, label: '일정 관리', icon: History },
+        { href: ROUTES.MASTER_SCHEDULE, label: '영업시간 설정', icon: History },
         { href: ROUTES.MASTER_MEMBERS, label: '회원 관리', icon: Users },
         { href: ROUTES.MASTER_JOIN_CODES, label: '초대코드', icon: KeyRound },
         { href: ROUTES.MASTER_CHAT, label: '채팅', icon: MessageSquare },

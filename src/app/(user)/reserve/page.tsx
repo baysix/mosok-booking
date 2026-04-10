@@ -24,8 +24,6 @@ import {
   CheckCircle,
 } from 'lucide-react';
 
-const SPECIALTIES: Specialty[] = ['굿', '점술', '사주', '타로', '궁합', '작명', '풍수', '해몽'];
-
 export default function ReservePage() {
   const { user, masterId, isLoading: authLoading, isAuthenticated, hasMembership } = useAuth();
   const router = useRouter();
@@ -263,7 +261,7 @@ export default function ReservePage() {
               <h2 className="text-base font-bold text-gray-900">상담 유형</h2>
             </div>
             <div className="flex flex-wrap gap-2">
-              {SPECIALTIES.map((specialty) => (
+              {(masterInfo?.specialties || []).map((specialty) => (
                 <button
                   key={specialty}
                   type="button"

@@ -3,7 +3,7 @@
 import { useRef, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Calendar, MessageSquare, User, ChevronRight, LayoutDashboard, History, Users, KeyRound } from 'lucide-react';
+import { Calendar, CalendarDays, MessageSquare, User, ChevronRight, LayoutDashboard, History, Users, KeyRound } from 'lucide-react';
 import { ROUTES } from '@/constants/routes';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -16,8 +16,9 @@ const USER_MENU = [
 
 const MASTER_MENU = [
   { href: ROUTES.MASTER_DASHBOARD, label: '대시보드', icon: LayoutDashboard },
+  { href: ROUTES.MASTER_CALENDAR, label: '예약 캘린더', icon: CalendarDays },
   { href: ROUTES.MASTER_RESERVATIONS, label: '예약 관리', icon: Calendar },
-  { href: ROUTES.MASTER_SCHEDULE, label: '일정 관리', icon: History },
+  { href: ROUTES.MASTER_SCHEDULE, label: '영업시간 설정', icon: History },
   { href: ROUTES.MASTER_MEMBERS, label: '회원 관리', icon: Users },
   { href: ROUTES.MASTER_JOIN_CODES, label: '초대코드', icon: KeyRound },
   { href: ROUTES.MASTER_PROFILE, label: '내 프로필', icon: User },
@@ -49,7 +50,7 @@ export function MyPageLayout({ children }: MyPageLayoutProps) {
   return (
     <div className="min-h-screen bg-white">
       {/* Mobile horizontal tab nav */}
-      <div className="lg:hidden sticky top-0 z-30 bg-white border-b border-gray-100">
+      <div className="lg:hidden sticky top-0 z-30 bg-gray-50 border-b border-gray-200 shadow-sm">
         <div
           ref={scrollRef}
           className="flex overflow-x-auto scrollbar-hide px-4 gap-1"
