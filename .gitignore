@@ -43,3 +43,6 @@ next-env.d.ts
 # capacitor
 /android
 /ios
+
+# notion scripts
+_notion_*.js
