@@ -322,7 +322,7 @@ export default function MasterProfilePage() {
 
             {/* Postcode Modal */}
             {showPostcode && (
-              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+              <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 px-4">
                 <div className="bg-white rounded-2xl w-full max-w-lg overflow-hidden shadow-xl">
                   <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
                     <span className="text-sm font-semibold text-gray-900">주소 검색</span>
