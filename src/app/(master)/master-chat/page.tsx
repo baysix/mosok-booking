@@ -1,68 +1,44 @@
+/**
+ * 마스터 채팅 목록 페이지
+ *
+ * 회원과의 채팅방 목록을 표시하는 마스터 전용 페이지.
+ * React Query로 채팅방 목록 조회, 공통 컴포넌트 사용.
+ */
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
-import { useAuth } from '@/hooks/useAuth';
-import { getChatRooms } from '@/services/chat.service';
-import { ChatRoomWithParticipant } from '@/types/chat.types';
+import { useMasterAuth } from '@/hooks/useMasterAuth';
+import { useChatRooms } from '@/hooks/queries';
+import { ListSkeleton } from '@/components/common/ListSkeleton';
+import { EmptyState } from '@/components/common/EmptyState';
 import ChatRoomCard from '@/components/chat/ChatRoomCard';
 import { MessageSquare } from 'lucide-react';
 
 export default function MasterChatPage() {
-  const router = useRouter();
-  const { user, isLoading } = useAuth();
-  const [rooms, setRooms] = useState<ChatRoomWithParticipant[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { isReady } = useMasterAuth();
+  const { data: rooms = [], isLoading } = useChatRooms(isReady);
 
-  const fetchRooms = useCallback(async () => {
-    try {
-      const data = await getChatRooms();
-      setRooms(data);
-    } catch (error) {
-      console.error('Failed to fetch rooms:', error);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (!isLoading && (!user || user.role !== 'master')) {
-      router.push('/');
-      return;
-    }
-    if (user) fetchRooms();
-  }, [user, isLoading, router, fetchRooms]);
-
-  if (isLoading || !user) return null;
+  if (!isReady) return null;
 
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="container mx-auto max-w-lg">
-        {/* Header */}
+        {/* 헤더 */}
         <div className="px-4 py-4">
           <h1 className="text-lg font-bold text-gray-900">채팅</h1>
         </div>
 
-        {/* Room list */}
+        {/* 채팅방 목록 */}
         <div className="bg-white border-y border-gray-100">
-          {loading ? (
-            <div className="divide-y divide-gray-50">
-              {[1, 2, 3].map((i) => (
-                <div key={i} className="flex items-center gap-3 p-4 animate-pulse">
-                  <div className="w-12 h-12 rounded-full bg-gray-100" />
-                  <div className="flex-1">
-                    <div className="h-4 w-24 bg-gray-100 rounded mb-2" />
-                    <div className="h-3 w-40 bg-gray-50 rounded" />
-                  </div>
-                </div>
-              ))}
+          {isLoading ? (
+            <div className="p-4">
+              <ListSkeleton count={3} variant="card" />
             </div>
           ) : rooms.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-20 text-gray-400">
-              <MessageSquare className="w-12 h-12 mb-3 text-gray-200" />
-              <p className="text-sm font-medium">아직 채팅이 없습니다</p>
-              <p className="text-xs mt-1">회원이 문의하면 여기에 표시됩니다</p>
-            </div>
+            <EmptyState
+              icon={MessageSquare}
+              title="아직 채팅이 없습니다"
+              description="회원이 문의하면 여기에 표시됩니다"
+            />
           ) : (
             <div className="divide-y divide-gray-50">
               {rooms.map((room) => (

@@ -1,10 +1,17 @@
+/**
+ * 회원 관리 페이지 (마스터 전용)
+ *
+ * 가입한 회원 목록을 조회하고, 검색/제거할 수 있는 페이지.
+ * React Query로 데이터 페칭, 공통 컴포넌트(ListSkeleton, EmptyState) 사용.
+ */
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
-import { useAuth } from '@/hooks/useAuth';
-import { getMembers, removeMember } from '@/services/membership.service';
-import { MembershipWithUser } from '@/types/membership.types';
+import { useState } from 'react';
+import { useMasterAuth } from '@/hooks/useMasterAuth';
+import { useMembersList, useRemoveMember } from '@/hooks/queries';
+import { ListSkeleton } from '@/components/common/ListSkeleton';
+import { EmptyState } from '@/components/common/EmptyState';
+import { formatDate } from '@/lib/utils/format';
 import {
   Users,
   Search,
@@ -15,54 +22,25 @@ import {
   UserX,
 } from 'lucide-react';
 
-function formatDate(isoStr: string): string {
-  const date = new Date(isoStr);
-  return `${date.getFullYear()}.${String(date.getMonth() + 1).padStart(2, '0')}.${String(date.getDate()).padStart(2, '0')}`;
-}
-
 export default function MasterMembersPage() {
-  const router = useRouter();
-  const { user, isLoading: authLoading } = useAuth();
-
-  const [members, setMembers] = useState<MembershipWithUser[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { isReady } = useMasterAuth();
+  const { data: members = [], isLoading } = useMembersList(isReady);
+  const removeMutation = useRemoveMember();
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Auth guard
-  useEffect(() => {
-    if (!authLoading && (!user || user.role !== 'master')) {
-      router.push('/');
-    }
-  }, [user, authLoading, router]);
+  if (!isReady) return null;
 
-  const fetchMembers = useCallback(async () => {
-    setLoading(true);
-    try {
-      const data = await getMembers();
-      setMembers(data);
-    } catch {
-      // silent
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (user?.role === 'master') {
-      fetchMembers();
-    }
-  }, [user, fetchMembers]);
-
+  /** 회원 제거 핸들러 */
   const handleRemoveMember = async (membershipId: string, name: string) => {
     if (!confirm(`${name}님을 회원에서 제거하시겠습니까?`)) return;
     try {
-      await removeMember(membershipId);
-      setMembers((prev) => prev.filter((m) => m.id !== membershipId));
+      await removeMutation.mutateAsync(membershipId);
     } catch (error: unknown) {
       alert(error instanceof Error ? error.message : '회원 삭제에 실패했습니다');
     }
   };
 
+  /** 검색어 필터링 */
   const filteredMembers = members.filter((m) => {
     if (!searchQuery.trim()) return true;
     const q = searchQuery.toLowerCase();
@@ -72,8 +50,6 @@ export default function MasterMembersPage() {
       (m.user.phone && m.user.phone.includes(q))
     );
   });
-
-  if (authLoading || !user) return null;
 
   return (
     <div className="min-h-screen bg-white">
@@ -89,7 +65,7 @@ export default function MasterMembersPage() {
           </div>
         </div>
 
-        {/* Search */}
+        {/* 검색 */}
         <div className="relative mb-4">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <input
@@ -101,31 +77,15 @@ export default function MasterMembersPage() {
           />
         </div>
 
-        {/* Member List */}
-        {loading ? (
-          <div className="space-y-3">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="bg-white rounded-2xl border border-gray-100 p-4 animate-pulse">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-gray-100 rounded-full" />
-                  <div className="flex-1 space-y-1.5">
-                    <div className="h-4 w-24 bg-gray-100 rounded" />
-                    <div className="h-3 w-32 bg-gray-100 rounded" />
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
+        {/* 회원 목록 */}
+        {isLoading ? (
+          <ListSkeleton count={3} variant="card" />
         ) : filteredMembers.length === 0 ? (
-          <div className="text-center py-20">
-            <UserX className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-            <h2 className="text-lg font-bold text-gray-900 mb-2">
-              {searchQuery ? '검색 결과가 없습니다' : '회원이 없습니다'}
-            </h2>
-            <p className="text-sm text-gray-500">
-              {searchQuery ? '다른 검색어로 시도해보세요' : '초대코드를 공유하여 회원을 모집하세요'}
-            </p>
-          </div>
+          <EmptyState
+            icon={UserX}
+            title={searchQuery ? '검색 결과가 없습니다' : '회원이 없습니다'}
+            description={searchQuery ? '다른 검색어로 시도해보세요' : '초대코드를 공유하여 회원을 모집하세요'}
+          />
         ) : (
           <div className="space-y-3">
             {filteredMembers.map((membership) => (

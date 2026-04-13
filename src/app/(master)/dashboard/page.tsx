@@ -1,13 +1,17 @@
+/**
+ * 마스터 대시보드 페이지
+ *
+ * 예약 현황 요약(통계 카드), 캘린더 바로가기, 오늘 예약 목록을 표시.
+ * React Query로 캘린더/일별 데이터를 병렬 조회.
+ */
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { useAuth } from '@/hooks/useAuth';
-import { getCalendarData, getDayReservations } from '@/services/reservation.service';
+import { useMasterAuth } from '@/hooks/useMasterAuth';
+import { useCalendarData, useDayReservations } from '@/hooks/queries';
+import { ListSkeleton } from '@/components/common/ListSkeleton';
+import { getTodayStr } from '@/lib/utils/format';
 import {
-  ReservationWithUser,
-  DashboardSummary,
   RESERVATION_STATUS_LABELS,
   RESERVATION_STATUS_COLORS,
 } from '@/types/reservation.types';
@@ -22,85 +26,33 @@ import {
 } from 'lucide-react';
 
 export default function MasterDashboardPage() {
-  const router = useRouter();
-  const { user, isLoading: authLoading } = useAuth();
+  const { isReady } = useMasterAuth();
 
   const now = new Date();
-  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  const todayStr = getTodayStr();
+  const year = now.getFullYear();
+  const month = now.getMonth() + 1;
 
-  const [loading, setLoading] = useState(true);
-  const [summary, setSummary] = useState<DashboardSummary>({
+  // 캘린더 요약 + 오늘 예약 병렬 조회
+  const { data: calData, isLoading: calLoading } = useCalendarData(year, month, isReady);
+  const { data: dayData, isLoading: dayLoading } = useDayReservations(todayStr, isReady);
+
+  if (!isReady) return null;
+
+  const loading = calLoading || dayLoading;
+  const summary = calData?.summary ?? {
     todayReservations: 0,
     pendingTotal: 0,
     thisWeekReservations: 0,
     thisMonthRevenue: 0,
-  });
-  const [todayReservations, setTodayReservations] = useState<ReservationWithUser[]>([]);
-
-  // Auth guard
-  useEffect(() => {
-    if (!authLoading && (!user || user.role !== 'master')) {
-      router.push('/');
-    }
-  }, [user, authLoading, router]);
-
-  const fetchData = useCallback(async () => {
-    const today = new Date();
-    const y = today.getFullYear();
-    const m = today.getMonth() + 1;
-    const dateStr = `${y}-${String(m).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-    setLoading(true);
-    try {
-      const [calData, dayData] = await Promise.all([
-        getCalendarData(y, m),
-        getDayReservations(dateStr),
-      ]);
-      setSummary(calData.summary);
-      setTodayReservations(dayData.reservations);
-    } catch {
-      // silent
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (user?.role === 'master') {
-      fetchData();
-    }
-  }, [user, fetchData]);
-
-  if (authLoading || !user) return null;
+  };
+  const todayReservations = dayData?.reservations ?? [];
 
   const statCards = [
-    {
-      label: '오늘 예약',
-      value: summary.todayReservations,
-      icon: Calendar,
-      color: 'text-indigo-500',
-      bg: 'bg-indigo-50',
-    },
-    {
-      label: '대기 중',
-      value: summary.pendingTotal,
-      icon: Clock,
-      color: 'text-amber-500',
-      bg: 'bg-amber-50',
-    },
-    {
-      label: '이번 주',
-      value: summary.thisWeekReservations,
-      icon: Users,
-      color: 'text-blue-500',
-      bg: 'bg-blue-50',
-    },
-    {
-      label: '이번 달 수익',
-      value: `₩${summary.thisMonthRevenue.toLocaleString()}`,
-      icon: TrendingUp,
-      color: 'text-green-500',
-      bg: 'bg-green-50',
-    },
+    { label: '오늘 예약', value: summary.todayReservations, icon: Calendar, color: 'text-indigo-500', bg: 'bg-indigo-50' },
+    { label: '대기 중', value: summary.pendingTotal, icon: Clock, color: 'text-amber-500', bg: 'bg-amber-50' },
+    { label: '이번 주', value: summary.thisWeekReservations, icon: Users, color: 'text-blue-500', bg: 'bg-blue-50' },
+    { label: '이번 달 수익', value: `₩${summary.thisMonthRevenue.toLocaleString()}`, icon: TrendingUp, color: 'text-green-500', bg: 'bg-green-50' },
   ];
 
   const todayDayOfWeek = ['일', '월', '화', '수', '목', '금', '토'][now.getDay()];
@@ -111,7 +63,7 @@ export default function MasterDashboardPage() {
         <h1 className="text-2xl font-bold text-gray-900 mb-1">대시보드</h1>
         <p className="text-sm text-gray-500 mb-5">예약 현황을 한눈에 확인하세요</p>
 
-        {/* Stat Cards */}
+        {/* 통계 카드 */}
         {loading ? (
           <div className="grid grid-cols-2 gap-3 mb-5">
             {[1, 2, 3, 4].map((i) => (
@@ -137,7 +89,7 @@ export default function MasterDashboardPage() {
           </div>
         )}
 
-        {/* Calendar shortcut */}
+        {/* 캘린더 바로가기 */}
         <Link
           href={ROUTES.MASTER_CALENDAR}
           className="flex items-center justify-between bg-indigo-50 rounded-2xl px-4 py-3.5 mb-5 group hover:bg-indigo-100 transition-colors"
@@ -154,7 +106,7 @@ export default function MasterDashboardPage() {
           <ChevronRight className="w-5 h-5 text-indigo-400 group-hover:translate-x-0.5 transition-transform" />
         </Link>
 
-        {/* Today's reservations */}
+        {/* 오늘 예약 */}
         <div className="bg-white rounded-2xl border border-gray-100 p-4">
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-sm font-bold text-gray-900">
@@ -164,11 +116,7 @@ export default function MasterDashboardPage() {
           </div>
 
           {loading ? (
-            <div className="space-y-2">
-              {[1, 2, 3].map((i) => (
-                <div key={i} className="h-12 bg-gray-50 rounded-xl animate-pulse" />
-              ))}
-            </div>
+            <ListSkeleton count={3} variant="simple" />
           ) : todayReservations.length === 0 ? (
             <div className="text-center py-8">
               <Calendar className="w-10 h-10 text-gray-200 mx-auto mb-2" />

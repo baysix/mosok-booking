@@ -1,54 +1,41 @@
+/**
+ * 채팅 서비스
+ *
+ * 채팅방 및 메시지 관련 API 호출을 담당하는 서비스 레이어.
+ */
+import { apiClient } from '@/lib/api-client';
 import { ChatRoomWithParticipant, ChatRoom, Message } from '@/types/chat.types';
 
+/** 채팅방 목록 조회 */
 export async function getChatRooms(): Promise<ChatRoomWithParticipant[]> {
-  const response = await fetch('/api/chat/rooms');
-  if (!response.ok) {
-    throw new Error('채팅방 목록을 불러오는데 실패했습니다');
-  }
-  const data = await response.json();
+  const data = await apiClient.get<{ rooms: ChatRoomWithParticipant[] }>('/api/chat/rooms');
   return data.rooms;
 }
 
+/** 채팅방 생성 또는 기존 채팅방 조회 */
 export async function getOrCreateRoom(masterId: string): Promise<ChatRoom> {
-  const response = await fetch('/api/chat/rooms', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ masterId }),
-  });
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || '채팅방 생성에 실패했습니다');
-  }
-  const data = await response.json();
+  const data = await apiClient.post<{ room: ChatRoom }>('/api/chat/rooms', { masterId });
   return data.room;
 }
 
+/** 채팅 메시지 목록 조회 */
 export async function getMessages(roomId: string): Promise<Message[]> {
-  const response = await fetch(`/api/chat/rooms/${roomId}/messages`);
-  if (!response.ok) {
-    throw new Error('메시지를 불러오는데 실패했습니다');
-  }
-  const data = await response.json();
+  const data = await apiClient.get<{ messages: Message[] }>(`/api/chat/rooms/${roomId}/messages`);
   return data.messages;
 }
 
+/** 메시지 전송 */
 export async function sendMessage(roomId: string, content: string): Promise<Message> {
-  const response = await fetch(`/api/chat/rooms/${roomId}/messages`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ content }),
-  });
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || '메시지 전송에 실패했습니다');
-  }
-  const data = await response.json();
+  const data = await apiClient.post<{ message: Message }>(`/api/chat/rooms/${roomId}/messages`, { content });
   return data.message;
 }
 
+/** 읽지 않은 메시지 수 조회 (에러 시 0 반환) */
 export async function getUnreadCount(): Promise<number> {
-  const response = await fetch('/api/chat/unread');
-  if (!response.ok) return 0;
-  const data = await response.json();
-  return data.count;
+  try {
+    const data = await apiClient.get<{ count: number }>('/api/chat/unread');
+    return data.count;
+  } catch {
+    return 0;
+  }
 }

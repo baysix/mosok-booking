@@ -1,47 +1,29 @@
+/**
+ * 스케줄 서비스
+ *
+ * 마스터 주간 일정 및 휴무일 관련 API 호출을 담당하는 서비스 레이어.
+ */
+import { apiClient } from '@/lib/api-client';
 import { MasterSchedule, WeeklyHour, OffDay } from '@/types/schedule.types';
 
+/** 내 스케줄 조회 (주간 일정 + 휴무일) */
 export async function getMySchedule(): Promise<MasterSchedule> {
-  const response = await fetch('/api/masters/me/schedule');
-  if (!response.ok) {
-    throw new Error('일정을 불러오는데 실패했습니다');
-  }
-  return response.json();
+  return apiClient.get<MasterSchedule>('/api/masters/me/schedule');
 }
 
+/** 주간 일정 저장 */
 export async function saveWeeklyHours(weeklyHours: WeeklyHour[]): Promise<WeeklyHour[]> {
-  const response = await fetch('/api/masters/me/schedule', {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ weeklyHours }),
-  });
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || '일정 저장에 실패했습니다');
-  }
-  const data = await response.json();
+  const data = await apiClient.put<{ weeklyHours: WeeklyHour[] }>('/api/masters/me/schedule', { weeklyHours });
   return data.weeklyHours;
 }
 
+/** 휴무일 추가 */
 export async function addOffDay(offDate: string, reason?: string): Promise<OffDay> {
-  const response = await fetch('/api/masters/me/schedule/off-days', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ offDate, reason }),
-  });
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || '휴무일 등록에 실패했습니다');
-  }
-  const data = await response.json();
+  const data = await apiClient.post<{ offDay: OffDay }>('/api/masters/me/schedule/off-days', { offDate, reason });
   return data.offDay;
 }
 
+/** 휴무일 삭제 */
 export async function deleteOffDay(id: string): Promise<void> {
-  const response = await fetch(`/api/masters/me/schedule/off-days?id=${id}`, {
-    method: 'DELETE',
-  });
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || '휴무일 삭제에 실패했습니다');
-  }
+  await apiClient.delete(`/api/masters/me/schedule/off-days?id=${id}`);
 }

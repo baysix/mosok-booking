@@ -1,15 +1,20 @@
+/**
+ * 마스터 예약 관리 페이지
+ *
+ * 고객 예약 목록 조회, 상태 필터, 승인/거절/완료 처리.
+ * React Query + StatusTabs + ListSkeleton + EmptyState 적용.
+ */
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
-import { useAuth } from '@/hooks/useAuth';
+import { useState, useEffect } from 'react';
+import { useMasterAuth } from '@/hooks/useMasterAuth';
+import { useMasterReservations, useUpdateReservationStatus, useCreateManualReservation } from '@/hooks/queries';
+import { StatusTabs } from '@/components/common/StatusTabs';
+import { ListSkeleton } from '@/components/common/ListSkeleton';
+import { EmptyState } from '@/components/common/EmptyState';
+import { BaseModal } from '@/components/common/BaseModal';
+import { formatDate } from '@/lib/utils/format';
 import {
-  getMasterReservations,
-  updateReservationStatus,
-  createManualReservation,
-} from '@/services/reservation.service';
-import {
-  ReservationWithUser,
   ReservationStatus,
   CreateManualReservationData,
   TimeSlot,
@@ -19,19 +24,16 @@ import {
   RESERVATION_SOURCE_LABELS,
   DURATION_OPTIONS,
   getDurationLabel,
-  getOccupiedSlots,
 } from '@/types/reservation.types';
 import { Specialty } from '@/types/master.types';
 import {
   Calendar,
   Phone,
-  Plus,
   X,
   Loader2,
   Tag,
   CreditCard,
   Users,
-  Clock,
 } from 'lucide-react';
 
 const CONSULTATION_TYPES: Specialty[] = ['굿', '점술', '사주', '타로', '궁합', '작명', '풍수', '해몽'];
@@ -44,92 +46,20 @@ const STATUS_TABS: { value: ReservationStatus | 'all'; label: string }[] = [
   { value: 'cancelled', label: '취소/거절' },
 ];
 
-function formatDate(dateStr: string): string {
-  const date = new Date(dateStr + 'T00:00:00');
-  return `${date.getFullYear()}.${String(date.getMonth() + 1).padStart(2, '0')}.${String(date.getDate()).padStart(2, '0')}`;
-}
-
-function formatCreatedAt(isoStr: string): string {
-  const date = new Date(isoStr);
-  return `${date.getFullYear()}.${String(date.getMonth() + 1).padStart(2, '0')}.${String(date.getDate()).padStart(2, '0')}`;
-}
-
 export default function MasterReservationsPage() {
-  const router = useRouter();
-  const { user, isLoading: authLoading } = useAuth();
-
-  const [reservations, setReservations] = useState<ReservationWithUser[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { isReady } = useMasterAuth();
   const [activeStatus, setActiveStatus] = useState<ReservationStatus | 'all'>('all');
-
-  // Manual reservation modal
   const [modalOpen, setModalOpen] = useState(false);
 
-  // Auth guard
-  useEffect(() => {
-    if (!authLoading && (!user || user.role !== 'master')) {
-      router.push('/');
-    }
-  }, [user, authLoading, router]);
+  // '취소/거절' 탭은 전체를 가져와서 클라이언트에서 필터링
+  const queryStatus = activeStatus === 'all' || activeStatus === 'cancelled' ? undefined : activeStatus;
+  const { data: reservations = [], isLoading } = useMasterReservations(queryStatus, isReady);
+  const updateMutation = useUpdateReservationStatus();
+  const createManualMutation = useCreateManualReservation();
 
-  const fetchReservations = useCallback(async (status?: ReservationStatus) => {
-    setLoading(true);
-    try {
-      const data = await getMasterReservations(status);
-      setReservations(data);
-    } catch {
-      // silent
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  if (!isReady) return null;
 
-  useEffect(() => {
-    if (!authLoading && user?.role === 'master') {
-      fetchReservations(activeStatus === 'all' || activeStatus === 'cancelled' ? undefined : activeStatus);
-    }
-  }, [user, authLoading, activeStatus, fetchReservations]);
-
-  const handleStatusFilter = (status: ReservationStatus | 'all') => {
-    setActiveStatus(status);
-  };
-
-  const handleApprove = async (reservationId: string) => {
-    if (!confirm('이 예약을 승인하시겠습니까?')) return;
-    try {
-      await updateReservationStatus(reservationId, { status: 'confirmed' });
-      fetchReservations(activeStatus === 'all' || activeStatus === 'cancelled' ? undefined : activeStatus);
-    } catch (error: unknown) {
-      alert(error instanceof Error ? error.message : '예약 승인에 실패했습니다');
-    }
-  };
-
-  const handleReject = async (reservationId: string) => {
-    const reason = prompt('거절 사유를 입력해주세요:');
-    if (reason === null) return;
-    try {
-      await updateReservationStatus(reservationId, { status: 'rejected', rejectionReason: reason });
-      fetchReservations(activeStatus === 'all' || activeStatus === 'cancelled' ? undefined : activeStatus);
-    } catch (error: unknown) {
-      alert(error instanceof Error ? error.message : '예약 거절에 실패했습니다');
-    }
-  };
-
-  const handleComplete = async (reservationId: string) => {
-    if (!confirm('상담 완료 처리하시겠습니까?')) return;
-    try {
-      await updateReservationStatus(reservationId, { status: 'completed' });
-      fetchReservations(activeStatus === 'all' || activeStatus === 'cancelled' ? undefined : activeStatus);
-    } catch (error: unknown) {
-      alert(error instanceof Error ? error.message : '완료 처리에 실패했습니다');
-    }
-  };
-
-  const handleManualSubmit = async (data: CreateManualReservationData) => {
-    await createManualReservation(data);
-    fetchReservations(activeStatus === 'all' || activeStatus === 'cancelled' ? undefined : activeStatus);
-  };
-
+  /** 클라이언트 필터링 (취소/거절 탭) */
   const filteredReservations =
     activeStatus === 'cancelled'
       ? reservations.filter((r) => r.status === 'cancelled' || r.status === 'rejected')
@@ -137,7 +67,41 @@ export default function MasterReservationsPage() {
 
   const pendingCount = reservations.filter((r) => r.status === 'pending').length;
 
-  if (authLoading || !user) return null;
+  /** 예약 승인 */
+  const handleApprove = async (reservationId: string) => {
+    if (!confirm('이 예약을 승인하시겠습니까?')) return;
+    try {
+      await updateMutation.mutateAsync({ id: reservationId, status: 'confirmed' });
+    } catch (error: unknown) {
+      alert(error instanceof Error ? error.message : '예약 승인에 실패했습니다');
+    }
+  };
+
+  /** 예약 거절 */
+  const handleReject = async (reservationId: string) => {
+    const reason = prompt('거절 사유를 입력해주세요:');
+    if (reason === null) return;
+    try {
+      await updateMutation.mutateAsync({ id: reservationId, status: 'rejected', rejectionReason: reason });
+    } catch (error: unknown) {
+      alert(error instanceof Error ? error.message : '예약 거절에 실패했습니다');
+    }
+  };
+
+  /** 상담 완료 처리 */
+  const handleComplete = async (reservationId: string) => {
+    if (!confirm('상담 완료 처리하시겠습니까?')) return;
+    try {
+      await updateMutation.mutateAsync({ id: reservationId, status: 'completed' });
+    } catch (error: unknown) {
+      alert(error instanceof Error ? error.message : '완료 처리에 실패했습니다');
+    }
+  };
+
+  /** 수동 예약 생성 */
+  const handleManualSubmit = async (data: CreateManualReservationData) => {
+    await createManualMutation.mutateAsync(data);
+  };
 
   return (
     <div className="min-h-screen bg-white">
@@ -147,56 +111,27 @@ export default function MasterReservationsPage() {
             <h1 className="text-2xl font-bold text-gray-900 mb-1">예약 관리</h1>
             <p className="text-sm text-gray-500">고객 예약을 확인하고 관리하세요</p>
           </div>
-          {/* 수동 예약은 캘린더에서만 가능 */}
         </div>
 
-        {/* Status Tabs */}
-        <div className="flex gap-2 overflow-x-auto pb-4 scrollbar-hide">
-          {STATUS_TABS.map((tab) => (
-            <button
-              key={tab.value}
-              onClick={() => handleStatusFilter(tab.value)}
-              className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${
-                activeStatus === tab.value
-                  ? 'bg-indigo-500 text-white'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              }`}
-            >
-              {tab.label}
-              {tab.value === 'pending' && pendingCount > 0 && (
-                <span className="ml-1.5 inline-flex items-center justify-center w-5 h-5 bg-white/20 rounded-full text-xs">
-                  {pendingCount}
-                </span>
-              )}
-            </button>
-          ))}
-        </div>
+        {/* 상태 필터 탭 */}
+        <StatusTabs
+          tabs={STATUS_TABS.map((tab) => ({
+            ...tab,
+            count: tab.value === 'pending' ? pendingCount : undefined,
+          }))}
+          active={activeStatus}
+          onChange={setActiveStatus}
+        />
 
-        {/* Reservation List */}
-        {loading ? (
-          <div className="space-y-4">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="bg-white rounded-2xl border border-gray-100 p-4 space-y-3 animate-pulse">
-                <div className="flex justify-between">
-                  <div className="h-5 w-16 bg-gray-100 rounded-full" />
-                  <div className="h-4 w-20 bg-gray-100 rounded" />
-                </div>
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-gray-100 rounded-full" />
-                  <div className="space-y-1.5 flex-1">
-                    <div className="h-4 w-24 bg-gray-100 rounded" />
-                    <div className="h-3 w-32 bg-gray-100 rounded" />
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
+        {/* 예약 목록 */}
+        {isLoading ? (
+          <ListSkeleton count={3} variant="card" />
         ) : filteredReservations.length === 0 ? (
-          <div className="text-center py-20">
-            <Calendar className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-            <h2 className="text-lg font-bold text-gray-900 mb-2">예약이 없습니다</h2>
-            <p className="text-sm text-gray-500">아직 들어온 예약이 없습니다</p>
-          </div>
+          <EmptyState
+            icon={Calendar}
+            title="예약이 없습니다"
+            description="아직 들어온 예약이 없습니다"
+          />
         ) : (
           <div className="space-y-4">
             {filteredReservations.map((reservation) => {
@@ -210,12 +145,10 @@ export default function MasterReservationsPage() {
 
               return (
                 <div key={reservation.id} className="bg-white rounded-2xl border border-gray-100 p-4 space-y-3">
-                  {/* Status + Date */}
+                  {/* 상태 + 날짜 */}
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-1.5">
-                      <span
-                        className={`px-2.5 py-0.5 text-xs font-bold rounded-full ${RESERVATION_STATUS_COLORS[reservation.status]}`}
-                      >
+                      <span className={`px-2.5 py-0.5 text-xs font-bold rounded-full ${RESERVATION_STATUS_COLORS[reservation.status]}`}>
                         {RESERVATION_STATUS_LABELS[reservation.status]}
                       </span>
                       <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${
@@ -225,10 +158,10 @@ export default function MasterReservationsPage() {
                         {RESERVATION_SOURCE_LABELS[reservation.source]}
                       </span>
                     </div>
-                    <span className="text-xs text-gray-400">{formatCreatedAt(reservation.createdAt)}</span>
+                    <span className="text-xs text-gray-400">{formatDate(reservation.createdAt)}</span>
                   </div>
 
-                  {/* Customer Info */}
+                  {/* 고객 정보 */}
                   <div className="flex items-center gap-3">
                     <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm flex-shrink-0 ${
                       isManual ? 'bg-orange-50 text-orange-600' : 'bg-indigo-50 text-indigo-600'
@@ -237,13 +170,11 @@ export default function MasterReservationsPage() {
                     </div>
                     <div>
                       <h3 className="font-bold text-gray-900 text-sm">{displayName}</h3>
-                      {displayContact && (
-                        <p className="text-xs text-gray-500">{displayContact}</p>
-                      )}
+                      {displayContact && <p className="text-xs text-gray-500">{displayContact}</p>}
                     </div>
                   </div>
 
-                  {/* Reservation Details */}
+                  {/* 예약 상세 */}
                   <div className="bg-gray-50 rounded-xl p-3 space-y-2 text-sm">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
@@ -251,7 +182,7 @@ export default function MasterReservationsPage() {
                         <span className="text-gray-500">상담일시</span>
                       </div>
                       <span className="font-medium text-gray-900">
-                        {formatDate(reservation.date)} {reservation.timeSlot}
+                        {formatDate(reservation.date + 'T00:00:00')} {reservation.timeSlot}
                         {reservation.duration > 1 && (
                           <span className="text-xs text-indigo-500 ml-1">({getDurationLabel(reservation.duration)})</span>
                         )}
@@ -282,7 +213,7 @@ export default function MasterReservationsPage() {
                     </div>
                   </div>
 
-                  {/* Notes */}
+                  {/* 고객 메모 */}
                   {reservation.notes && (
                     <div className="bg-blue-50 rounded-xl p-3 text-sm text-blue-800">
                       <span className="font-medium">고객 요청사항: </span>
@@ -290,7 +221,7 @@ export default function MasterReservationsPage() {
                     </div>
                   )}
 
-                  {/* Pending Actions */}
+                  {/* 대기 중 액션 */}
                   {reservation.status === 'pending' && (
                     <div className="flex gap-2 pt-1">
                       <button
@@ -308,7 +239,7 @@ export default function MasterReservationsPage() {
                     </div>
                   )}
 
-                  {/* Complete Action */}
+                  {/* 완료 처리 */}
                   {reservation.status === 'confirmed' && (
                     <button
                       onClick={() => handleComplete(reservation.id)}
@@ -318,7 +249,7 @@ export default function MasterReservationsPage() {
                     </button>
                   )}
 
-                  {/* Rejection Reason */}
+                  {/* 거절 사유 */}
                   {reservation.status === 'rejected' && reservation.rejectionReason && (
                     <div className="bg-red-50 rounded-xl p-3 text-sm text-red-600">
                       <span className="font-medium">거절 사유: </span>
@@ -331,7 +262,7 @@ export default function MasterReservationsPage() {
           </div>
         )}
 
-        {/* Manual Reservation Modal */}
+        {/* 수동 예약 모달 */}
         {modalOpen && (
           <ManualReservationModal
             onClose={() => setModalOpen(false)}
@@ -343,7 +274,7 @@ export default function MasterReservationsPage() {
   );
 }
 
-// ============ Manual Reservation Modal (standalone) ============
+// ============ 수동 예약 등록 모달 ============
 
 interface ManualReservationModalProps {
   onClose: () => void;
@@ -366,12 +297,6 @@ function ManualReservationModal({ onClose, onSubmit }: ManualReservationModalPro
   const [totalPrice, setTotalPrice] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
-
-  // 모달 열릴 때 배경 스크롤 차단
-  useEffect(() => {
-    document.body.style.overflow = 'hidden';
-    return () => { document.body.style.overflow = ''; };
-  }, []);
 
   const handleSubmit = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -407,183 +332,165 @@ function ManualReservationModal({ onClose, onSubmit }: ManualReservationModalPro
   };
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center">
-      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-      <div className="relative w-full sm:max-w-md bg-white rounded-t-2xl sm:rounded-2xl max-h-[90vh] flex flex-col animate-in slide-in-from-bottom duration-300">
-        {/* 고정 헤더 */}
-        <div className="flex-shrink-0">
-          <div className="sm:hidden flex justify-center pt-3">
-            <div className="w-10 h-1 rounded-full bg-gray-300" />
-          </div>
-
-          <div className="flex items-center justify-between p-4 pb-2">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-orange-50 flex items-center justify-center">
-                <Phone className="w-4 h-4 text-orange-500" />
-              </div>
-              <h3 className="text-base font-bold text-gray-900">수동 예약 등록</h3>
-            </div>
-            <button onClick={onClose} className="p-2 rounded-lg hover:bg-gray-100 transition-colors">
-              <X className="w-5 h-5 text-gray-400" />
-            </button>
-          </div>
+    <BaseModal
+      isOpen
+      onClose={onClose}
+      title="수동 예약 등록"
+      icon={
+        <div className="w-8 h-8 rounded-lg bg-orange-50 flex items-center justify-center">
+          <Phone className="w-4 h-4 text-orange-500" />
         </div>
-
-        {/* 스크롤 가능한 폼 영역 */}
-        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-4 pt-2 space-y-4">
-          {error && (
-            <div className="px-3 py-2 rounded-lg bg-red-50 text-sm text-red-600">{error}</div>
+      }
+      footer={
+        <button
+          type="button"
+          onClick={handleSubmit}
+          disabled={isSubmitting || !customerName.trim()}
+          className="w-full h-12 rounded-xl bg-indigo-500 text-white text-sm font-semibold hover:bg-indigo-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+        >
+          {isSubmitting ? (
+            <>
+              <Loader2 className="w-4 h-4 animate-spin" />
+              등록 중...
+            </>
+          ) : (
+            '예약 등록'
           )}
+        </button>
+      }
+    >
+      <form onSubmit={handleSubmit} className="space-y-4">
+        {error && (
+          <div className="px-3 py-2 rounded-lg bg-red-50 text-sm text-red-600">{error}</div>
+        )}
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">
-              날짜 <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="date"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-              className="w-full h-11 px-3 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">
-              시간 <span className="text-red-500">*</span>
-            </label>
-            <div className="grid grid-cols-5 gap-1.5">
-              {ALL_TIME_SLOTS.map((slot) => (
-                <button
-                  key={slot}
-                  type="button"
-                  onClick={() => setTimeSlot(slot)}
-                  className={`py-2 rounded-lg text-xs font-medium transition-colors ${
-                    timeSlot === slot
-                      ? 'bg-indigo-500 text-white'
-                      : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
-                  }`}
-                >
-                  {slot}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">
-              고객명 <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="text"
-              value={customerName}
-              onChange={(e) => setCustomerName(e.target.value)}
-              placeholder="고객 이름"
-              className="w-full h-11 px-3 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">연락처</label>
-            <input
-              type="tel"
-              value={customerPhone}
-              onChange={(e) => setCustomerPhone(e.target.value)}
-              placeholder="010-0000-0000"
-              className="w-full h-11 px-3 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">
-              소요 시간 <span className="text-red-500">*</span>
-            </label>
-            <div className="flex flex-wrap gap-2">
-              {DURATION_OPTIONS.map((opt) => (
-                <button
-                  key={opt.value}
-                  type="button"
-                  onClick={() => setDuration(opt.value)}
-                  className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
-                    duration === opt.value
-                      ? 'bg-indigo-500 text-white'
-                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                  }`}
-                >
-                  {opt.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">
-              상담 유형 <span className="text-red-500">*</span>
-            </label>
-            <div className="flex flex-wrap gap-2">
-              {CONSULTATION_TYPES.map((type) => (
-                <button
-                  key={type}
-                  type="button"
-                  onClick={() => setConsultationType(type)}
-                  className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
-                    consultationType === type
-                      ? 'bg-indigo-500 text-white'
-                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                  }`}
-                >
-                  {type}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">상담료</label>
-            <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-400">₩</span>
-              <input
-                type="number"
-                value={totalPrice}
-                onChange={(e) => setTotalPrice(e.target.value)}
-                placeholder="0"
-                className="w-full h-11 pl-8 pr-3 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">메모</label>
-            <textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="예약 관련 메모"
-              rows={2}
-              className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors"
-            />
-          </div>
-
-          <div className="pb-2" />
-        </form>
-
-        {/* 하단 고정 버튼 */}
-        <div className="flex-shrink-0 p-4 pt-2 border-t border-gray-100">
-          <button
-            type="button"
-            onClick={handleSubmit}
-            disabled={isSubmitting || !customerName.trim()}
-            className="w-full h-12 rounded-xl bg-indigo-500 text-white text-sm font-semibold hover:bg-indigo-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-          >
-            {isSubmitting ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                등록 중...
-              </>
-            ) : (
-              '예약 등록'
-            )}
-          </button>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1.5">
+            날짜 <span className="text-red-500">*</span>
+          </label>
+          <input
+            type="date"
+            value={date}
+            onChange={(e) => setDate(e.target.value)}
+            className="w-full h-11 px-3 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors"
+          />
         </div>
-      </div>
-    </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1.5">
+            시간 <span className="text-red-500">*</span>
+          </label>
+          <div className="grid grid-cols-5 gap-1.5">
+            {ALL_TIME_SLOTS.map((slot) => (
+              <button
+                key={slot}
+                type="button"
+                onClick={() => setTimeSlot(slot)}
+                className={`py-2 rounded-lg text-xs font-medium transition-colors ${
+                  timeSlot === slot
+                    ? 'bg-indigo-500 text-white'
+                    : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
+                }`}
+              >
+                {slot}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1.5">
+            고객명 <span className="text-red-500">*</span>
+          </label>
+          <input
+            type="text"
+            value={customerName}
+            onChange={(e) => setCustomerName(e.target.value)}
+            placeholder="고객 이름"
+            className="w-full h-11 px-3 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1.5">연락처</label>
+          <input
+            type="tel"
+            value={customerPhone}
+            onChange={(e) => setCustomerPhone(e.target.value)}
+            placeholder="010-0000-0000"
+            className="w-full h-11 px-3 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1.5">
+            소요 시간 <span className="text-red-500">*</span>
+          </label>
+          <div className="flex flex-wrap gap-2">
+            {DURATION_OPTIONS.map((opt) => (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => setDuration(opt.value)}
+                className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                  duration === opt.value
+                    ? 'bg-indigo-500 text-white'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1.5">
+            상담 유형 <span className="text-red-500">*</span>
+          </label>
+          <div className="flex flex-wrap gap-2">
+            {CONSULTATION_TYPES.map((type) => (
+              <button
+                key={type}
+                type="button"
+                onClick={() => setConsultationType(type)}
+                className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                  consultationType === type
+                    ? 'bg-indigo-500 text-white'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+              >
+                {type}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1.5">상담료</label>
+          <div className="relative">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-400">₩</span>
+            <input
+              type="number"
+              value={totalPrice}
+              onChange={(e) => setTotalPrice(e.target.value)}
+              placeholder="0"
+              className="w-full h-11 pl-8 pr-3 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors"
+            />
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1.5">메모</label>
+          <textarea
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            placeholder="예약 관련 메모"
+            rows={2}
+            className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors"
+          />
+        </div>
+      </form>
+    </BaseModal>
   );
 }

@@ -1,11 +1,18 @@
+/**
+ * 사용자 기원 서비스 페이지
+ *
+ * 내 기원 주문 목록 조회 (대기/진행 중/완료/취소 필터).
+ * React Query + StatusTabs + ListSkeleton 적용.
+ */
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
-import { getMyPrayerOrders } from '@/services/prayer.service';
+import { useMyPrayerOrders } from '@/hooks/queries';
+import { StatusTabs } from '@/components/common/StatusTabs';
+import { ListSkeleton } from '@/components/common/ListSkeleton';
 import {
-  PrayerOrder,
   PrayerOrderStatus,
   PRAYER_ORDER_STATUS_LABELS,
   PRAYER_ORDER_STATUS_COLORS,
@@ -16,32 +23,29 @@ import { ROUTES } from '@/constants/routes';
 import { ActivePrayerDisplay } from '@/components/prayer/ActivePrayerDisplay';
 import { PrayerOrderCard } from '@/components/prayer/PrayerOrderCard';
 
+/** 필터 탭 옵션 */
+const FILTER_TABS: { value: PrayerOrderStatus | ''; label: string }[] = [
+  { value: '', label: '전체' },
+  { value: 'pending', label: '대기' },
+  { value: 'active', label: '진행 중' },
+  { value: 'completed', label: '기원 완료' },
+  { value: 'cancelled', label: '취소' },
+];
+
 export default function UserPrayerPage() {
   const router = useRouter();
   const { user, isLoading: authLoading } = useAuth();
-  const [orders, setOrders] = useState<PrayerOrder[]>([]);
-  const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<PrayerOrderStatus | ''>('');
 
+  // 인증 가드
   useEffect(() => {
     if (!authLoading && !user) router.push('/');
   }, [user, authLoading, router]);
 
-  const fetchOrders = useCallback(async () => {
-    setLoading(true);
-    try {
-      const data = await getMyPrayerOrders(statusFilter || undefined);
-      setOrders(data);
-    } catch {
-      // silent
-    } finally {
-      setLoading(false);
-    }
-  }, [statusFilter]);
+  const isReady = !authLoading && !!user;
+  const { data: orders = [], isLoading } = useMyPrayerOrders(statusFilter || undefined, isReady);
 
-  useEffect(() => { fetchOrders(); }, [fetchOrders]);
-
-  if (authLoading || !user) return null;
+  if (!isReady) return null;
 
   const pendingOrders = orders.filter((o) => o.status === 'pending');
   const activeOrders = orders.filter((o) => o.status === 'active');
@@ -56,35 +60,18 @@ export default function UserPrayerPage() {
         </div>
         <p className="text-sm text-gray-500 mb-5">기원 현황을 확인하세요</p>
 
-        {/* Filter */}
-        <div className="flex gap-2 mb-4">
-          {[
-            { value: '' as const, label: '전체' },
-            { value: 'pending' as const, label: '대기' },
-            { value: 'active' as const, label: '진행 중' },
-            { value: 'completed' as const, label: '기원 완료' },
-            { value: 'cancelled' as const, label: '취소' },
-          ].map((opt) => (
-            <button
-              key={opt.value}
-              onClick={() => setStatusFilter(opt.value)}
-              className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
-                statusFilter === opt.value
-                  ? 'bg-orange-500 text-white'
-                  : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
-              }`}
-            >
-              {opt.label}
-            </button>
-          ))}
+        {/* 상태 필터 */}
+        <div className="mb-4">
+          <StatusTabs
+            tabs={FILTER_TABS}
+            active={statusFilter}
+            onChange={setStatusFilter}
+            activeColor="bg-orange-500"
+          />
         </div>
 
-        {loading ? (
-          <div className="space-y-3">
-            {[1, 2].map((i) => (
-              <div key={i} className="h-28 bg-gray-50 rounded-xl animate-pulse" />
-            ))}
-          </div>
+        {isLoading ? (
+          <ListSkeleton count={2} variant="row" />
         ) : orders.length === 0 ? (
           <div className="text-center py-16">
             <Flame className="w-12 h-12 text-gray-200 mx-auto mb-3" />
@@ -100,7 +87,7 @@ export default function UserPrayerPage() {
           </div>
         ) : (
           <>
-            {/* Pending Orders */}
+            {/* 대기 중 주문 */}
             {pendingOrders.length > 0 && statusFilter !== 'active' && statusFilter !== 'completed' && statusFilter !== 'cancelled' && (
               <div className="mb-6">
                 <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">승인 대기 중</p>
@@ -132,7 +119,7 @@ export default function UserPrayerPage() {
               </div>
             )}
 
-            {/* Active Orders — Animated Visuals */}
+            {/* 진행 중 기원 — 애니메이션 비주얼 */}
             {activeOrders.length > 0 && statusFilter !== 'pending' && statusFilter !== 'completed' && statusFilter !== 'cancelled' && (
               <div className="mb-6">
                 <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">진행 중인 기원</p>
@@ -154,7 +141,7 @@ export default function UserPrayerPage() {
               </div>
             )}
 
-            {/* Other Orders — Card List */}
+            {/* 이전 기원 — 카드 리스트 */}
             {otherOrders.length > 0 && statusFilter !== 'pending' && statusFilter !== 'active' && (
               <div>
                 {(activeOrders.length > 0 || pendingOrders.length > 0) && !statusFilter && (

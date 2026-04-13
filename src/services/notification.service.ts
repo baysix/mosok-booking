@@ -1,13 +1,17 @@
+/**
+ * 알림 서비스
+ *
+ * 알림 조회 및 읽음 처리 관련 API 호출을 담당하는 서비스 레이어.
+ */
+import { apiClient } from '@/lib/api-client';
 import { Notification } from '@/types/notification.types';
 
+/** 알림 목록 조회 (읽지 않은 수 포함) */
 export async function getNotifications(): Promise<{ notifications: Notification[]; unreadCount: number }> {
-  const response = await fetch('/api/notifications');
-  if (!response.ok) {
-    throw new Error('알림을 불러오는데 실패했습니다');
-  }
-  return response.json();
+  return apiClient.get('/api/notifications');
 }
 
+/** 읽지 않은 알림 수 조회 (에러 시 0 반환) */
 export async function getUnreadNotificationCount(): Promise<number> {
   try {
     const data = await getNotifications();
@@ -17,20 +21,12 @@ export async function getUnreadNotificationCount(): Promise<number> {
   }
 }
 
+/** 알림 읽음 처리 */
 export async function markNotificationAsRead(id: string): Promise<void> {
-  const response = await fetch(`/api/notifications/${id}`, {
-    method: 'PATCH',
-  });
-  if (!response.ok) {
-    throw new Error('알림 읽음 처리에 실패했습니다');
-  }
+  await apiClient.patch(`/api/notifications/${id}`);
 }
 
+/** 전체 알림 읽음 처리 */
 export async function markAllNotificationsAsRead(): Promise<void> {
-  const response = await fetch('/api/notifications/read-all', {
-    method: 'PATCH',
-  });
-  if (!response.ok) {
-    throw new Error('전체 알림 읽음 처리에 실패했습니다');
-  }
+  await apiClient.patch('/api/notifications/read-all');
 }

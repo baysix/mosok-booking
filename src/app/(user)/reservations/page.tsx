@@ -1,16 +1,25 @@
+/**
+ * 사용자 예약 내역 페이지
+ *
+ * 사용자 본인의 예약 내역 조회 및 취소 기능.
+ * React Query + StatusTabs + ListSkeleton + EmptyState 적용.
+ */
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState } from 'react';
+import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
+import { useMyReservations, useUpdateReservationStatus } from '@/hooks/queries';
+import { StatusTabs } from '@/components/common/StatusTabs';
+import { ListSkeleton } from '@/components/common/ListSkeleton';
+import { EmptyState } from '@/components/common/EmptyState';
 import { ROUTES } from '@/constants/routes';
 import {
-  Reservation,
   ReservationStatus,
   RESERVATION_STATUS_LABELS,
   RESERVATION_STATUS_COLORS,
 } from '@/types/reservation.types';
-import { getMyReservations, updateReservationStatus } from '@/services/reservation.service';
 import {
   Calendar,
   Clock,
@@ -36,12 +45,9 @@ export default function ReservationsPage() {
   const router = useRouter();
 
   const [filter, setFilter] = useState<FilterStatus>('all');
-  const [reservations, setReservations] = useState<Reservation[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
   const [cancellingId, setCancellingId] = useState<string | null>(null);
 
-  // Auth guard
+  // 인증 가드
   useEffect(() => {
     if (!authLoading) {
       if (!isAuthenticated) {
@@ -52,37 +58,17 @@ export default function ReservationsPage() {
     }
   }, [authLoading, isAuthenticated, hasMembership, router]);
 
-  const fetchReservations = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError('');
-      const status = filter === 'all' ? undefined : filter;
-      const data = await getMyReservations(status);
-      setReservations(data);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : '예약 목록을 불러오는데 실패했습니다');
-    } finally {
-      setLoading(false);
-    }
-  }, [filter]);
+  const isReady = !authLoading && isAuthenticated && hasMembership;
+  const queryStatus = filter === 'all' ? undefined : filter;
+  const { data: reservations = [], isLoading, error } = useMyReservations(queryStatus, isReady);
+  const updateMutation = useUpdateReservationStatus();
 
-  useEffect(() => {
-    if (isAuthenticated && hasMembership) {
-      fetchReservations();
-    }
-  }, [isAuthenticated, hasMembership, fetchReservations]);
-
+  /** 예약 취소 핸들러 */
   const handleCancel = async (reservationId: string) => {
     if (!confirm('예약을 취소하시겠습니까?')) return;
-
     try {
       setCancellingId(reservationId);
-      await updateReservationStatus(reservationId, { status: 'cancelled' });
-      setReservations((prev) =>
-        prev.map((r) =>
-          r.id === reservationId ? { ...r, status: 'cancelled' as ReservationStatus } : r
-        )
-      );
+      await updateMutation.mutateAsync({ id: reservationId, status: 'cancelled' });
     } catch (err) {
       alert(err instanceof Error ? err.message : '취소에 실패했습니다');
     } finally {
@@ -90,7 +76,8 @@ export default function ReservationsPage() {
     }
   };
 
-  const formatDate = (dateStr: string) => {
+  /** 날짜 포맷 (요일 포함) */
+  const formatDateWithDay = (dateStr: string) => {
     const date = new Date(dateStr + 'T00:00:00');
     const year = date.getFullYear();
     const month = date.getMonth() + 1;
@@ -99,7 +86,6 @@ export default function ReservationsPage() {
     return `${year}. ${month}. ${day}. (${dayOfWeek})`;
   };
 
-  // Loading state
   if (authLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -114,74 +100,45 @@ export default function ReservationsPage() {
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="max-w-2xl mx-auto">
-        {/* Page Header */}
+        {/* 페이지 헤더 */}
         <div className="mb-6">
           <h1 className="text-2xl font-bold text-gray-900 mb-1">예약 내역</h1>
           <p className="text-sm text-gray-500">나의 예약 내역을 확인하세요</p>
         </div>
 
-        {/* Status Filter Tabs */}
-        <div className="flex gap-2 overflow-x-auto pb-4 mb-4 scrollbar-hide">
-          {STATUS_FILTERS.map(({ value, label }) => (
-            <button
-              key={value}
-              onClick={() => setFilter(value)}
-              className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${
-                filter === value
-                  ? 'bg-primary text-white'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              }`}
-            >
-              {label}
-            </button>
-          ))}
+        {/* 상태 필터 탭 */}
+        <div className="mb-4">
+          <StatusTabs
+            tabs={STATUS_FILTERS}
+            active={filter}
+            onChange={setFilter}
+            activeColor="bg-primary"
+          />
         </div>
 
-        {/* Error State */}
+        {/* 에러 상태 */}
         {error && (
           <div className="flex items-center gap-2 bg-red-50 text-red-600 text-sm p-4 rounded-xl border border-red-100 mb-4">
             <AlertCircle className="w-4 h-4 flex-shrink-0" />
-            {error}
+            {error instanceof Error ? error.message : '예약 목록을 불러오는데 실패했습니다'}
           </div>
         )}
 
-        {/* Loading State */}
-        {loading ? (
-          <div className="space-y-4">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="bg-white rounded-2xl border border-gray-100 p-5 animate-pulse">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="h-5 w-32 bg-gray-100 rounded" />
-                  <div className="h-6 w-20 bg-gray-100 rounded-full" />
-                </div>
-                <div className="space-y-2">
-                  <div className="h-4 w-24 bg-gray-100 rounded" />
-                  <div className="h-4 w-40 bg-gray-100 rounded" />
-                </div>
-              </div>
-            ))}
-          </div>
+        {/* 예약 목록 */}
+        {isLoading ? (
+          <ListSkeleton count={3} variant="card" />
         ) : reservations.length === 0 ? (
-          /* Empty State */
-          <div className="text-center py-16">
-            <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gray-100 flex items-center justify-center">
-              <CalendarX className="w-8 h-8 text-gray-400" />
-            </div>
-            <h3 className="text-base font-semibold text-gray-900 mb-1">예약 내역이 없습니다</h3>
-            <p className="text-sm text-gray-500 mb-6">
-              {filter === 'all'
+          <EmptyState
+            icon={CalendarX}
+            title="예약 내역이 없습니다"
+            description={
+              filter === 'all'
                 ? '아직 예약하신 내역이 없습니다'
-                : `${STATUS_FILTERS.find((f) => f.value === filter)?.label} 상태의 예약이 없습니다`}
-            </p>
-            <button
-              onClick={() => router.push(ROUTES.USER_RESERVE)}
-              className="px-6 py-2.5 bg-primary text-white text-sm font-semibold rounded-xl hover:bg-primary/90 transition-colors"
-            >
-              예약하기
-            </button>
-          </div>
+                : `${STATUS_FILTERS.find((f) => f.value === filter)?.label} 상태의 예약이 없습니다`
+            }
+            action={{ label: '예약하기', onClick: () => router.push(ROUTES.USER_RESERVE) }}
+          />
         ) : (
-          /* Reservation Cards */
           <div className="space-y-4">
             {reservations.map((reservation) => {
               const canCancel =
@@ -193,21 +150,19 @@ export default function ReservationsPage() {
                   key={reservation.id}
                   className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 transition-all hover:shadow-md"
                 >
-                  {/* Header: Date + Status Badge */}
+                  {/* 헤더: 날짜 + 상태 뱃지 */}
                   <div className="flex items-center justify-between mb-3">
                     <h3 className="text-sm font-bold text-gray-900">
-                      {formatDate(reservation.date)}
+                      {formatDateWithDay(reservation.date)}
                     </h3>
                     <span
-                      className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                        RESERVATION_STATUS_COLORS[reservation.status]
-                      }`}
+                      className={`px-3 py-1 rounded-full text-xs font-semibold ${RESERVATION_STATUS_COLORS[reservation.status]}`}
                     >
                       {RESERVATION_STATUS_LABELS[reservation.status]}
                     </span>
                   </div>
 
-                  {/* Details */}
+                  {/* 상세 정보 */}
                   <div className="space-y-2">
                     <div className="flex items-center gap-2 text-sm text-gray-600">
                       <Clock className="w-4 h-4 text-gray-400" />
@@ -225,21 +180,21 @@ export default function ReservationsPage() {
                     )}
                   </div>
 
-                  {/* Notes */}
+                  {/* 메모 */}
                   {reservation.notes && (
                     <p className="mt-3 text-xs text-gray-500 bg-gray-50 rounded-lg p-3">
                       {reservation.notes}
                     </p>
                   )}
 
-                  {/* Rejection Reason */}
+                  {/* 거절 사유 */}
                   {reservation.status === 'rejected' && reservation.rejectionReason && (
                     <p className="mt-3 text-xs text-red-600 bg-red-50 rounded-lg p-3">
                       거절 사유: {reservation.rejectionReason}
                     </p>
                   )}
 
-                  {/* Cancel Button */}
+                  {/* 취소 버튼 */}
                   {canCancel && (
                     <div className="mt-4 pt-3 border-t border-gray-100">
                       <button

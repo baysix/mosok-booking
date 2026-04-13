@@ -1,10 +1,18 @@
+/**
+ * 마스터 프로필 수정 페이지
+ *
+ * 점집 정보(상호명, 소개, 전문분야, 주소, 계좌 등) 조회·수정.
+ * React Query(useMyMasterProfile, useUpdateMasterProfile) + useMasterAuth + useBodyLock 적용.
+ */
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAuth } from '@/hooks/useAuth';
-import { getMyMasterProfile, updateMyMasterProfile } from '@/services/master.service';
-import { MasterProfile, MasterStatus, Specialty } from '@/types/master.types';
+import { useMasterAuth } from '@/hooks/useMasterAuth';
+import { useMyMasterProfile, useUpdateMasterProfile } from '@/hooks/queries';
+import { useBodyLock } from '@/hooks/useBodyLock';
+import { ListSkeleton } from '@/components/common/ListSkeleton';
+import { MasterStatus, Specialty } from '@/types/master.types';
 import { SPECIALTIES } from '@/constants/regions';
 import ImageUploader from '@/components/upload/ImageUploader';
 import DaumPostcodeEmbed, { Address } from 'react-daum-postcode';
@@ -22,6 +30,7 @@ import {
   Plus,
 } from 'lucide-react';
 
+/** 마스터 승인 상태별 스타일 */
 const STATUS_CONFIG: Record<MasterStatus, { label: string; icon: React.ElementType; className: string }> = {
   pending: { label: '승인 대기', icon: Clock, className: 'bg-amber-50 text-amber-700 border-amber-200' },
   approved: { label: '승인 완료', icon: CheckCircle, className: 'bg-green-50 text-green-700 border-green-200' },
@@ -31,14 +40,13 @@ const STATUS_CONFIG: Record<MasterStatus, { label: string; icon: React.ElementTy
 
 export default function MasterProfilePage() {
   const router = useRouter();
-  const { user, isLoading: authLoading } = useAuth();
+  const { isReady } = useMasterAuth();
 
-  const [profile, setProfile] = useState<MasterProfile | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  /** React Query: 프로필 조회 & 수정 */
+  const { data: profile, isLoading } = useMyMasterProfile(isReady);
+  const updateMutation = useUpdateMasterProfile();
 
-  // Form state
+  /** 로컬 폼 상태 */
   const [businessName, setBusinessName] = useState('');
   const [description, setDescription] = useState('');
   const [specialties, setSpecialties] = useState<Specialty[]>([]);
@@ -53,56 +61,34 @@ export default function MasterProfilePage() {
   const [images, setImages] = useState<string[]>([]);
   const [customSpecialty, setCustomSpecialty] = useState('');
   const [showPostcode, setShowPostcode] = useState(false);
+  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [initialized, setInitialized] = useState(false);
 
-  // 모달 열릴 때 배경 스크롤 차단
-  useEffect(() => {
-    if (showPostcode) {
-      document.body.style.overflow = 'hidden';
-      return () => { document.body.style.overflow = ''; };
-    }
-  }, [showPostcode]);
+  /** 주소 검색 모달 스크롤 차단 */
+  useBodyLock(showPostcode);
 
-  // 카카오맵 SDK 로드 (Geocoder 사용 위해)
+  /** 카카오맵 SDK (Geocoder 사용) */
   useKakaoLoader({ appkey: process.env.NEXT_PUBLIC_KAKAO_MAP_APP_KEY || '', libraries: ['services'] });
 
-  // Auth guard
+  /** 쿼리 데이터 → 로컬 상태 동기화 (최초 1회) */
   useEffect(() => {
-    if (!authLoading && (!user || user.role !== 'master')) {
-      router.push('/');
+    if (profile && !initialized) {
+      setBusinessName(profile.businessName);
+      setDescription(profile.description);
+      setSpecialties(profile.specialties);
+      setYearsExperience(String(profile.yearsExperience));
+      setBasePrice(String(profile.basePrice));
+      setBankName(profile.bankName || '');
+      setAccountNumber(profile.accountNumber || '');
+      setAccountHolder(profile.accountHolder || '');
+      setRegion(profile.region);
+      setDetailAddress(profile.address);
+      setImages(profile.images);
+      setInitialized(true);
     }
-  }, [user, authLoading, router]);
+  }, [profile, initialized]);
 
-  const fetchProfile = useCallback(async () => {
-    setLoading(true);
-    try {
-      const data = await getMyMasterProfile();
-      if (data) {
-        setProfile(data);
-        setBusinessName(data.businessName);
-        setDescription(data.description);
-        setSpecialties(data.specialties);
-        setYearsExperience(String(data.yearsExperience));
-        setBasePrice(String(data.basePrice));
-        setBankName(data.bankName || '');
-        setAccountNumber(data.accountNumber || '');
-        setAccountHolder(data.accountHolder || '');
-        setRegion(data.region);
-        setDetailAddress(data.address);
-        setImages(data.images);
-      }
-    } catch {
-      // silent
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (user?.role === 'master') {
-      fetchProfile();
-    }
-  }, [user, fetchProfile]);
-
+  /** 알림 메시지 3초 후 자동 해제 */
   useEffect(() => {
     if (message) {
       const timer = setTimeout(() => setMessage(null), 3000);
@@ -110,13 +96,13 @@ export default function MasterProfilePage() {
     }
   }, [message]);
 
+  /** 주소 검색 완료 핸들러 (카카오 Geocoder로 좌표 획득) */
   const handlePostcodeComplete = (data: Address) => {
     const roadAddr = data.roadAddress || data.address;
     setRegion(roadAddr);
     setDetailAddress('');
     setShowPostcode(false);
 
-    // 카카오맵 Geocoder로 좌표 획득
     if (window.kakao?.maps?.services) {
       const geocoder = new window.kakao.maps.services.Geocoder();
       geocoder.addressSearch(roadAddr, (result: { x: string; y: string }[], status: string) => {
@@ -132,9 +118,7 @@ export default function MasterProfilePage() {
 
   const toggleSpecialty = (specialty: Specialty) => {
     setSpecialties((prev) =>
-      prev.includes(specialty)
-        ? prev.filter((s) => s !== specialty)
-        : [...prev, specialty]
+      prev.includes(specialty) ? prev.filter((s) => s !== specialty) : [...prev, specialty]
     );
   };
 
@@ -153,15 +137,15 @@ export default function MasterProfilePage() {
     setSpecialties((prev) => prev.filter((s) => s !== specialty));
   };
 
+  /** 프로필 저장 — useUpdateMasterProfile mutation 사용 */
   const handleSave = async () => {
     if (!businessName.trim()) {
       setMessage({ type: 'error', text: '상호명을 입력해주세요' });
       return;
     }
 
-    setSaving(true);
     try {
-      const updated = await updateMyMasterProfile({
+      await updateMutation.mutateAsync({
         businessName: businessName.trim(),
         description: description.trim(),
         specialties,
@@ -175,29 +159,19 @@ export default function MasterProfilePage() {
         images,
         ...(coords && { latitude: coords.latitude, longitude: coords.longitude }),
       });
-      setProfile(updated);
       setMessage({ type: 'success', text: '프로필이 저장되었습니다' });
     } catch (error) {
       setMessage({ type: 'error', text: error instanceof Error ? error.message : '저장에 실패했습니다' });
-    } finally {
-      setSaving(false);
     }
   };
 
-  if (authLoading || !user) return null;
+  if (!isReady) return null;
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="min-h-screen bg-white">
         <div className="container mx-auto px-4 py-6 max-w-3xl">
-          <div className="space-y-4">
-            {[1, 2, 3, 4].map((i) => (
-              <div key={i} className="bg-white rounded-2xl border border-gray-100 p-5 animate-pulse">
-                <div className="h-4 w-20 bg-gray-100 rounded mb-3" />
-                <div className="h-11 bg-gray-50 rounded-xl" />
-              </div>
-            ))}
-          </div>
+          <ListSkeleton count={4} variant="card" />
         </div>
       </div>
     );
@@ -222,7 +196,7 @@ export default function MasterProfilePage() {
           </button>
         </div>
 
-        {/* Snackbar toast */}
+        {/* 스낵바 토스트 */}
         {message && (
           <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[70] animate-in fade-in slide-in-from-bottom-4 duration-300">
             <div
@@ -242,7 +216,7 @@ export default function MasterProfilePage() {
           </div>
         )}
 
-        {/* Approval Status */}
+        {/* 승인 상태 배너 */}
         {profile && statusConfig && (
           <div className={`mb-5 px-4 py-3 rounded-xl border flex items-center gap-2 ${statusConfig.className}`}>
             <StatusIcon className="w-4 h-4 flex-shrink-0" />
@@ -250,9 +224,9 @@ export default function MasterProfilePage() {
           </div>
         )}
 
-        {/* Form */}
+        {/* 프로필 폼 */}
         <div className="space-y-5">
-          {/* Business Name */}
+          {/* 상호명 */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1.5">
               상호명 <span className="text-red-500">*</span>
@@ -266,11 +240,9 @@ export default function MasterProfilePage() {
             />
           </div>
 
-          {/* Description */}
+          {/* 소개 */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">
-              소개
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">소개</label>
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
@@ -280,11 +252,9 @@ export default function MasterProfilePage() {
             />
           </div>
 
-          {/* Specialties */}
+          {/* 전문분야 */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">
-              전문분야
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">전문분야</label>
             <div className="flex flex-wrap gap-2">
               {SPECIALTIES.map((s) => {
                 const active = specialties.includes(s.value as Specialty);
@@ -305,7 +275,7 @@ export default function MasterProfilePage() {
               })}
             </div>
 
-            {/* Custom specialty input */}
+            {/* 커스텀 전문분야 입력 */}
             <div className="flex gap-2 mt-3">
               <input
                 type="text"
@@ -330,7 +300,7 @@ export default function MasterProfilePage() {
               </button>
             </div>
 
-            {/* Selected specialties tags */}
+            {/* 선택된 전문분야 태그 */}
             {specialties.length > 0 && (
               <div className="flex flex-wrap gap-2 mt-3">
                 {specialties.map((s) => (
@@ -352,11 +322,9 @@ export default function MasterProfilePage() {
             )}
           </div>
 
-          {/* Years Experience */}
+          {/* 경력 */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">
-              경력 (년)
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">경력 (년)</label>
             <input
               type="number"
               value={yearsExperience}
@@ -367,11 +335,9 @@ export default function MasterProfilePage() {
             />
           </div>
 
-          {/* Base Price */}
+          {/* 기본 예약금 */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">
-              기본 예약금
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">기본 예약금</label>
             <div className="relative">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-400">₩</span>
               <input
@@ -385,11 +351,9 @@ export default function MasterProfilePage() {
             </div>
           </div>
 
-          {/* Bank Account */}
+          {/* 입금 계좌 */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">
-              입금 계좌
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">입금 계좌</label>
             <p className="text-xs text-gray-400 mb-2">예약금 입금을 받을 계좌 정보를 입력하세요</p>
             <div className="space-y-2">
               <input
@@ -416,11 +380,9 @@ export default function MasterProfilePage() {
             </div>
           </div>
 
-          {/* Address Search */}
+          {/* 주소 검색 */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">
-              주소
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">주소</label>
             <button
               type="button"
               onClick={() => setShowPostcode(true)}
@@ -430,7 +392,7 @@ export default function MasterProfilePage() {
               {region ? region : '주소를 검색하세요'}
             </button>
 
-            {/* Postcode Modal */}
+            {/* 주소 검색 모달 */}
             {showPostcode && (
               <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 px-4">
                 <div className="bg-white rounded-2xl w-full max-w-lg overflow-hidden shadow-xl">
@@ -452,7 +414,7 @@ export default function MasterProfilePage() {
               </div>
             )}
 
-            {/* Selected Address Display */}
+            {/* 선택된 주소 표시 */}
             {region && (
               <div className="mt-2 px-3 py-2.5 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center gap-2">
                 <MapPin className="w-4 h-4 text-indigo-500 flex-shrink-0" />
@@ -461,11 +423,9 @@ export default function MasterProfilePage() {
             )}
           </div>
 
-          {/* Detail Address */}
+          {/* 상세 주소 */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">
-              상세 주소 (동/호수)
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">상세 주소 (동/호수)</label>
             <input
               type="text"
               value={detailAddress}
@@ -475,21 +435,21 @@ export default function MasterProfilePage() {
             />
           </div>
 
-          {/* Image Upload */}
+          {/* 이미지 업로드 */}
           <ImageUploader
             images={images}
             onChange={setImages}
             maxImages={5}
           />
 
-          {/* Save Button */}
+          {/* 저장 버튼 */}
           <div className="sticky bottom-4 mt-4 z-10">
             <button
               onClick={handleSave}
-              disabled={saving}
+              disabled={updateMutation.isPending}
               className="w-full py-3.5 rounded-xl bg-indigo-500 text-white text-sm font-bold hover:bg-indigo-600 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg"
             >
-              {saving ? (
+              {updateMutation.isPending ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
                   저장 중...

@@ -1,139 +1,87 @@
+/**
+ * 기원 서비스
+ *
+ * 기원 상품 및 주문 관련 API 호출을 담당하는 서비스 레이어.
+ * - 마스터: 상품 CRUD, 주문 관리
+ * - 사용자: 상품 조회, 기원 신청, 내 기원 조회
+ */
+import { apiClient } from '@/lib/api-client';
 import {
   PrayerProduct,
   PrayerOrder,
   PrayerOrderWithUser,
   PrayerOrderStatus,
   CreatePrayerProductData,
+  UpdatePrayerProductData,
   CreatePrayerOrderData,
   CreateManualPrayerOrderData,
 } from '@/types/prayer.types';
 
-// ===== MASTER: Products =====
+// ===== 마스터: 상품 관리 =====
 
+/** 내 기원 상품 목록 조회 */
 export async function getMyPrayerProducts(): Promise<PrayerProduct[]> {
-  const response = await fetch('/api/masters/me/prayer-products');
-  if (!response.ok) throw new Error('기원 상품 목록을 불러오는데 실패했습니다');
-  const data = await response.json();
+  const data = await apiClient.get<{ products: PrayerProduct[] }>('/api/masters/me/prayer-products');
   return data.products;
 }
 
-export async function createPrayerProduct(data: CreatePrayerProductData): Promise<PrayerProduct> {
-  const response = await fetch('/api/masters/me/prayer-products', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data),
-  });
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || '기원 상품 등록에 실패했습니다');
-  }
-  const result = await response.json();
-  return result.product;
+/** 기원 상품 등록 */
+export async function createPrayerProduct(body: CreatePrayerProductData): Promise<PrayerProduct> {
+  const data = await apiClient.post<{ product: PrayerProduct }>('/api/masters/me/prayer-products', body);
+  return data.product;
 }
 
-export async function updatePrayerProduct(
-  id: string,
-  data: { category?: string; name?: string; description?: string; isActive?: boolean; options?: { durationDays: number; price: number }[] }
-): Promise<PrayerProduct> {
-  const response = await fetch(`/api/masters/me/prayer-products/${id}`, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data),
-  });
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || '기원 상품 수정에 실패했습니다');
-  }
-  const result = await response.json();
-  return result.product;
+/** 기원 상품 수정 */
+export async function updatePrayerProduct(id: string, body: UpdatePrayerProductData): Promise<PrayerProduct> {
+  const data = await apiClient.patch<{ product: PrayerProduct }>(`/api/masters/me/prayer-products/${id}`, body);
+  return data.product;
 }
 
+/** 기원 상품 삭제 */
 export async function deletePrayerProduct(id: string): Promise<void> {
-  const response = await fetch(`/api/masters/me/prayer-products/${id}`, {
-    method: 'DELETE',
-  });
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || '기원 상품 삭제에 실패했습니다');
-  }
+  await apiClient.delete(`/api/masters/me/prayer-products/${id}`);
 }
 
-// ===== MASTER: Orders =====
+// ===== 마스터: 주문 관리 =====
 
-export async function getMasterPrayerOrders(
-  status?: PrayerOrderStatus
-): Promise<PrayerOrderWithUser[]> {
+/** 마스터 기원 주문 목록 조회 */
+export async function getMasterPrayerOrders(status?: PrayerOrderStatus): Promise<PrayerOrderWithUser[]> {
   const params = new URLSearchParams();
   if (status) params.append('status', status);
-
-  const response = await fetch(`/api/masters/me/prayer-orders?${params.toString()}`);
-  if (!response.ok) throw new Error('기원 주문 목록을 불러오는데 실패했습니다');
-  const data = await response.json();
+  const data = await apiClient.get<{ orders: PrayerOrderWithUser[] }>(`/api/masters/me/prayer-orders?${params}`);
   return data.orders;
 }
 
-export async function createManualPrayerOrder(
-  data: CreateManualPrayerOrderData
-): Promise<PrayerOrder> {
-  const response = await fetch('/api/masters/me/prayer-orders', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data),
-  });
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || '기원 수동 등록에 실패했습니다');
-  }
-  const result = await response.json();
-  return result.order;
+/** 기원 수동 등록 (마스터가 직접 등록) */
+export async function createManualPrayerOrder(body: CreateManualPrayerOrderData): Promise<PrayerOrder> {
+  const data = await apiClient.post<{ order: PrayerOrder }>('/api/masters/me/prayer-orders', body);
+  return data.order;
 }
 
-export async function updateMasterPrayerOrderStatus(
-  id: string,
-  status: PrayerOrderStatus
-): Promise<PrayerOrder> {
-  const response = await fetch(`/api/masters/me/prayer-orders/${id}`, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ status }),
-  });
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || '기원 상태 변경에 실패했습니다');
-  }
-  const result = await response.json();
-  return result.order;
+/** 기원 주문 상태 변경 */
+export async function updateMasterPrayerOrderStatus(id: string, status: PrayerOrderStatus): Promise<PrayerOrder> {
+  const data = await apiClient.patch<{ order: PrayerOrder }>(`/api/masters/me/prayer-orders/${id}`, { status });
+  return data.order;
 }
 
-// ===== USER =====
+// ===== 사용자 =====
 
+/** 이용 가능한 기원 상품 목록 조회 */
 export async function getAvailablePrayerProducts(): Promise<PrayerProduct[]> {
-  const response = await fetch('/api/prayer-products');
-  if (!response.ok) throw new Error('기원 서비스 목록을 불러오는데 실패했습니다');
-  const data = await response.json();
+  const data = await apiClient.get<{ products: PrayerProduct[] }>('/api/prayer-products');
   return data.products;
 }
 
+/** 내 기원 주문 목록 조회 */
 export async function getMyPrayerOrders(status?: PrayerOrderStatus): Promise<PrayerOrder[]> {
   const params = new URLSearchParams();
   if (status) params.append('status', status);
-
-  const response = await fetch(`/api/prayer-orders?${params.toString()}`);
-  if (!response.ok) throw new Error('내 기원 목록을 불러오는데 실패했습니다');
-  const data = await response.json();
+  const data = await apiClient.get<{ orders: PrayerOrder[] }>(`/api/prayer-orders?${params}`);
   return data.orders;
 }
 
-export async function applyPrayerOrder(data: CreatePrayerOrderData): Promise<PrayerOrder> {
-  const response = await fetch('/api/prayer-orders', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data),
-  });
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || '기원 신청에 실패했습니다');
-  }
-  const result = await response.json();
-  return result.order;
+/** 기원 신청 (사용자 온라인 신청) */
+export async function applyPrayerOrder(body: CreatePrayerOrderData): Promise<PrayerOrder> {
+  const data = await apiClient.post<{ order: PrayerOrder }>('/api/prayer-orders', body);
+  return data.order;
 }

@@ -1,18 +1,28 @@
+/**
+ * 마스터 예약 캘린더 페이지
+ *
+ * 월별 캘린더 뷰 + 일별 예약 현황 + 수동 예약 등록.
+ * React Query(useCalendarData, useDayReservations, useMyMasterProfile,
+ * useUpdateReservationStatus, useCreateManualReservation) + useMasterAuth 적용.
+ */
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
-import { useAuth } from '@/hooks/useAuth';
+import { useState } from 'react';
+import { useMasterAuth } from '@/hooks/useMasterAuth';
 import {
-  getCalendarData,
-  getDayReservations,
-  updateReservationStatus,
-  createManualReservation,
-} from '@/services/reservation.service';
+  useCalendarData,
+  useDayReservations,
+  useUpdateReservationStatus,
+  useCreateManualReservation,
+} from '@/hooks/queries';
+import { useMyMasterProfile } from '@/hooks/queries';
+import { useBodyLock } from '@/hooks/useBodyLock';
+import { BaseModal } from '@/components/common/BaseModal';
+import { ListSkeleton } from '@/components/common/ListSkeleton';
+import { getTodayStr } from '@/lib/utils/format';
 import {
   ReservationWithUser,
   ReservationStatus,
-  CalendarDayData,
   CreateManualReservationData,
   TimeSlot,
   ALL_TIME_SLOTS,
@@ -23,7 +33,6 @@ import {
   DURATION_OPTIONS,
 } from '@/types/reservation.types';
 import { Specialty } from '@/types/master.types';
-import { getMyMasterProfile } from '@/services/master.service';
 import { DAY_LABELS } from '@/types/schedule.types';
 import {
   Clock,
@@ -37,128 +46,55 @@ import {
   Loader2,
 } from 'lucide-react';
 
+/** 마스터 전문분야 없을 때 기본 상담 유형 */
 const DEFAULT_CONSULTATION_TYPES: Specialty[] = ['굿', '점술', '사주', '타로', '궁합', '작명', '풍수', '해몽'];
 
 export default function MasterCalendarPage() {
-  const router = useRouter();
-  const { user, isLoading: authLoading } = useAuth();
+  const { isReady } = useMasterAuth();
 
+  const todayStr = getTodayStr();
   const now = new Date();
-  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth() + 1);
   const [selectedDate, setSelectedDate] = useState<string | null>(todayStr);
-  const [calendarLoading, setCalendarLoading] = useState(true);
-  const [dayData, setDayData] = useState<CalendarDayData[]>([]);
 
-  // Day detail state
-  const [dayReservations, setDayReservations] = useState<ReservationWithUser[]>([]);
-  const [availableSlots, setAvailableSlots] = useState<{ time: string; available: boolean }[]>([]);
-  const [dayLoading, setDayLoading] = useState(false);
-  const [updatingId, setUpdatingId] = useState<string | null>(null);
+  /** React Query: 월별 캘린더 데이터 */
+  const { data: calendarResult, isLoading: calendarLoading } = useCalendarData(year, month, isReady);
+  const dayData = calendarResult?.days ?? [];
 
-  // Manual reservation modal
+  /** React Query: 선택된 날짜의 예약 + 슬롯 */
+  const { data: dayResult, isLoading: dayLoading } = useDayReservations(
+    selectedDate ?? '',
+    isReady && !!selectedDate,
+  );
+  const dayReservations = dayResult?.reservations ?? [];
+  const availableSlots = dayResult?.availableSlots ?? [];
+
+  /** React Query: 마스터 프로필 (상담 유형 추출용) */
+  const { data: masterProfile } = useMyMasterProfile(isReady);
+  const masterSpecialties = masterProfile?.specialties ?? [];
+
+  /** Mutations */
+  const statusMutation = useUpdateReservationStatus();
+  const manualMutation = useCreateManualReservation();
+
+  /** 수동 예약 모달 상태 */
   const [modalOpen, setModalOpen] = useState(false);
   const [modalTimeSlot, setModalTimeSlot] = useState<TimeSlot>('09:00');
-  const [masterSpecialties, setMasterSpecialties] = useState<Specialty[]>([]);
+  const [updatingId, setUpdatingId] = useState<string | null>(null);
 
-  // Auth guard
-  useEffect(() => {
-    if (!authLoading && (!user || user.role !== 'master')) {
-      router.push('/');
-    }
-  }, [user, authLoading, router]);
+  if (!isReady) return null;
 
-  // Fetch master specialties
-  useEffect(() => {
-    if (user?.role === 'master') {
-      getMyMasterProfile().then((profile) => {
-        if (profile && profile.specialties.length > 0) {
-          setMasterSpecialties(profile.specialties);
-        }
-      }).catch(() => {});
-    }
-  }, [user]);
+  // ── 캘린더 렌더링 데이터 ──
+  const dataMap = new Map(dayData.map((d) => [d.date, d]));
+  const daysInMonth = new Date(year, month, 0).getDate();
+  const firstDay = new Date(year, month - 1, 1).getDay();
 
-  // Fetch calendar data
-  const fetchCalendar = useCallback(async () => {
-    setCalendarLoading(true);
-    try {
-      const data = await getCalendarData(year, month);
-      setDayData(data.days);
-    } catch {
-      // silent
-    } finally {
-      setCalendarLoading(false);
-    }
-  }, [year, month]);
-
-  useEffect(() => {
-    if (user?.role === 'master') {
-      fetchCalendar();
-    }
-  }, [user, fetchCalendar]);
-
-  // Fetch day reservations
-  const fetchDay = useCallback(async (date: string) => {
-    setDayLoading(true);
-    try {
-      const data = await getDayReservations(date);
-      setDayReservations(data.reservations);
-      setAvailableSlots(data.availableSlots);
-    } catch {
-      // silent
-    } finally {
-      setDayLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (selectedDate) {
-      fetchDay(selectedDate);
-    }
-  }, [selectedDate, fetchDay]);
-
-  // Handlers
   const handleMonthChange = (y: number, m: number) => {
     setYear(y);
     setMonth(m);
     setSelectedDate(null);
-    setDayReservations([]);
   };
-
-  const handleSelectDate = (date: string) => {
-    setSelectedDate(date);
-  };
-
-  const handleStatusChange = async (reservationId: string, status: ReservationStatus) => {
-    setUpdatingId(reservationId);
-    try {
-      await updateReservationStatus(reservationId, { status });
-      await Promise.all([fetchCalendar(), selectedDate ? fetchDay(selectedDate) : Promise.resolve()]);
-    } catch {
-      // silent
-    } finally {
-      setUpdatingId(null);
-    }
-  };
-
-  const handleAddManual = (timeSlot: TimeSlot) => {
-    setModalTimeSlot(timeSlot);
-    setModalOpen(true);
-  };
-
-  const handleManualSubmit = async (data: CreateManualReservationData) => {
-    await createManualReservation(data);
-    await Promise.all([fetchCalendar(), selectedDate ? fetchDay(selectedDate) : Promise.resolve()]);
-  };
-
-  if (authLoading || !user) return null;
-
-  // Calendar rendering
-  const dataMap = new Map(dayData.map((d) => [d.date, d]));
-  const daysInMonth = new Date(year, month, 0).getDate();
-  const firstDay = new Date(year, month - 1, 1).getDay();
 
   const prevMonth = () => {
     if (month === 1) handleMonthChange(year - 1, 12);
@@ -170,6 +106,24 @@ export default function MasterCalendarPage() {
     else handleMonthChange(year, month + 1);
   };
 
+  /** 예약 상태 변경 */
+  const handleStatusChange = async (reservationId: string, status: ReservationStatus) => {
+    setUpdatingId(reservationId);
+    try {
+      await statusMutation.mutateAsync({ id: reservationId, status });
+    } catch {
+      // silent — React Query가 캐시를 자동 무효화
+    } finally {
+      setUpdatingId(null);
+    }
+  };
+
+  /** 수동 예약 등록 */
+  const handleManualSubmit = async (data: CreateManualReservationData) => {
+    await manualMutation.mutateAsync(data);
+  };
+
+  // ── 캘린더 셀 생성 ──
   const calendarCells: React.ReactNode[] = [];
   for (let i = 0; i < firstDay; i++) {
     calendarCells.push(<div key={`e-${i}`} />);
@@ -185,7 +139,7 @@ export default function MasterCalendarPage() {
     calendarCells.push(
       <button
         key={day}
-        onClick={() => handleSelectDate(dateStr)}
+        onClick={() => setSelectedDate(dateStr)}
         className={`
           relative flex flex-col items-center justify-center rounded-xl min-h-[52px] transition-all active:scale-95
           ${isSelected ? 'bg-indigo-500 text-white shadow-md' : ''}
@@ -216,7 +170,7 @@ export default function MasterCalendarPage() {
     );
   }
 
-  // Day reservation slot rendering
+  // ── 일별 예약 슬롯 맵 ──
   const availMap = new Map(availableSlots.map((s) => [s.time, s.available]));
   const slotOwner = new Map<string, ReservationWithUser>();
   const slotRole = new Map<string, 'start' | 'continuation'>();
@@ -235,7 +189,7 @@ export default function MasterCalendarPage() {
         <h1 className="text-2xl font-bold text-gray-900 mb-1">예약 캘린더</h1>
         <p className="text-sm text-gray-500 mb-5">날짜별 예약 현황을 확인하고 관리하세요</p>
 
-        {/* Calendar */}
+        {/* 캘린더 */}
         <div className="bg-white rounded-2xl border border-gray-100 p-4 mb-4">
           <div className="flex items-center justify-between mb-4">
             <button onClick={prevMonth} className="p-2 rounded-xl hover:bg-gray-100 active:bg-gray-200 transition-colors">
@@ -249,6 +203,7 @@ export default function MasterCalendarPage() {
             </button>
           </div>
 
+          {/* 요일 헤더 */}
           <div className="grid grid-cols-7 gap-1 mb-1">
             {DAY_LABELS.map((label, i) => (
               <div
@@ -272,6 +227,7 @@ export default function MasterCalendarPage() {
             <div className="grid grid-cols-7 gap-1">{calendarCells}</div>
           )}
 
+          {/* 범례 */}
           <div className="flex items-center justify-center gap-4 mt-3 pt-3 border-t border-gray-50">
             <div className="flex items-center gap-1">
               <span className="w-2 h-2 rounded-full bg-amber-400" />
@@ -292,15 +248,11 @@ export default function MasterCalendarPage() {
           </div>
         </div>
 
-        {/* Day Reservations */}
+        {/* 일별 예약 현황 */}
         {selectedDate && (
           dayLoading ? (
             <div className="bg-white rounded-2xl border border-gray-100 p-6">
-              <div className="space-y-3">
-                {[1, 2, 3].map((i) => (
-                  <div key={i} className="h-14 bg-gray-50 rounded-xl animate-pulse" />
-                ))}
-              </div>
+              <ListSkeleton count={3} variant="row" />
             </div>
           ) : (
             <div className="bg-white rounded-2xl border border-gray-100 p-4">
@@ -318,6 +270,7 @@ export default function MasterCalendarPage() {
                   const role = slotRole.get(slot);
                   const isAvailable = availMap.get(slot) ?? false;
 
+                  /* 연속 슬롯 (continuation) */
                   if (reservation && role === 'continuation') {
                     return (
                       <div
@@ -332,6 +285,7 @@ export default function MasterCalendarPage() {
                     );
                   }
 
+                  /* 예약 시작 슬롯 */
                   if (reservation && role === 'start') {
                     const isManual = reservation.source === 'manual';
                     const customerName = isManual
@@ -395,6 +349,7 @@ export default function MasterCalendarPage() {
                           </div>
                         </div>
 
+                        {/* 상태 변경 버튼 */}
                         {(reservation.status === 'pending' || reservation.status === 'confirmed') && (
                           <div className="flex gap-2 mt-2 ml-[60px]">
                             {reservation.status === 'pending' && (
@@ -433,11 +388,11 @@ export default function MasterCalendarPage() {
                     );
                   }
 
-                  // Empty slot
+                  /* 빈 슬롯 — 수동 예약 추가 버튼 */
                   return (
                     <button
                       key={slot}
-                      onClick={() => handleAddManual(slot)}
+                      onClick={() => { setModalTimeSlot(slot); setModalOpen(true); }}
                       className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl border-2 border-dashed transition-colors group ${
                         isAvailable
                           ? 'border-gray-200 hover:border-indigo-300 hover:bg-indigo-50/30'
@@ -464,7 +419,7 @@ export default function MasterCalendarPage() {
           )
         )}
 
-        {/* Manual Reservation Modal */}
+        {/* 수동 예약 등록 모달 */}
         {selectedDate && modalOpen && (
           <ManualReservationModal
             isOpen={modalOpen}
@@ -481,7 +436,7 @@ export default function MasterCalendarPage() {
   );
 }
 
-// ============ Manual Reservation Modal ============
+// ============ 수동 예약 등록 모달 ============
 
 interface ManualReservationModalProps {
   isOpen: boolean;
@@ -510,13 +465,8 @@ function ManualReservationModal({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
 
-  // 모달 열릴 때 배경 스크롤 차단
-  useEffect(() => {
-    if (isOpen) {
-      document.body.style.overflow = 'hidden';
-      return () => { document.body.style.overflow = ''; };
-    }
-  }, [isOpen]);
+  /** 모달 스크롤 차단 */
+  useBodyLock(isOpen);
 
   if (!isOpen) return null;
 
@@ -526,7 +476,7 @@ function ManualReservationModal({
     return `${Number(m)}월 ${Number(d)}일 (${dayOfWeek})`;
   })();
 
-  // 기존 예약의 점유 슬롯 계산 (취소/거절 제외)
+  // 기존 활성 예약의 점유 슬롯 계산
   const activeReservations = existingReservations.filter(
     r => r.status !== 'cancelled' && r.status !== 'rejected'
   );
@@ -538,7 +488,7 @@ function ManualReservationModal({
 
   const startIdx = ALL_TIME_SLOTS.indexOf(timeSlot);
 
-  // 선택한 시간부터 연속으로 비어있는 슬롯 수 계산
+  // 선택한 시간부터 연속 비어있는 슬롯 수
   let maxFreeSlots = 0;
   for (let i = startIdx; i < ALL_TIME_SLOTS.length; i++) {
     if (occupiedSlotSet.has(ALL_TIME_SLOTS[i])) break;
@@ -573,11 +523,6 @@ function ManualReservationModal({
         customerPhone: customerPhone.trim() || undefined,
         notes: notes.trim() || undefined,
       });
-      setCustomerName('');
-      setCustomerPhone('');
-      setConsultationType(consultationTypes[0] || '사주');
-      setDuration(1);
-      setNotes('');
       onClose();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : '예약 등록에 실패했습니다');
@@ -587,158 +532,138 @@ function ManualReservationModal({
   };
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center">
-      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-      <div className="relative w-full sm:max-w-md bg-white rounded-t-2xl sm:rounded-2xl max-h-[90vh] flex flex-col animate-in slide-in-from-bottom duration-300">
-        {/* 고정 헤더 */}
-        <div className="flex-shrink-0">
-          <div className="sm:hidden flex justify-center pt-3">
-            <div className="w-10 h-1 rounded-full bg-gray-300" />
-          </div>
+    <BaseModal
+      isOpen={isOpen}
+      onClose={onClose}
+      title="수동 예약 등록"
+      icon={
+        <div className="w-8 h-8 rounded-lg bg-orange-50 flex items-center justify-center">
+          <Phone className="w-4 h-4 text-orange-500" />
+        </div>
+      }
+      footer={
+        <button
+          type="button"
+          onClick={handleSubmit}
+          disabled={isSubmitting || !customerName.trim()}
+          className="w-full h-12 rounded-xl bg-indigo-500 text-white text-sm font-semibold hover:bg-indigo-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+        >
+          {isSubmitting ? (
+            <>
+              <Loader2 className="w-4 h-4 animate-spin" />
+              등록 중...
+            </>
+          ) : (
+            '예약 등록'
+          )}
+        </button>
+      }
+    >
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <p className="text-xs text-gray-500">{formattedDate} {displayTimeSlot}</p>
 
-          <div className="flex items-center justify-between p-4 pb-2">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-orange-50 flex items-center justify-center">
-                <Phone className="w-4 h-4 text-orange-500" />
-              </div>
-              <div>
-                <h3 className="text-base font-bold text-gray-900">수동 예약 등록</h3>
-                <p className="text-xs text-gray-500">{formattedDate} {displayTimeSlot}</p>
-              </div>
-            </div>
-            <button onClick={onClose} className="p-2 rounded-lg hover:bg-gray-100 transition-colors">
-              <X className="w-5 h-5 text-gray-400" />
-            </button>
-          </div>
+        {error && (
+          <div className="px-3 py-2 rounded-lg bg-red-50 text-sm text-red-600">{error}</div>
+        )}
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1.5">
+            고객명 <span className="text-red-500">*</span>
+          </label>
+          <input
+            type="text"
+            value={customerName}
+            onChange={(e) => setCustomerName(e.target.value)}
+            placeholder="고객 이름"
+            className="w-full h-11 px-3 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors"
+            autoFocus
+          />
         </div>
 
-        {/* 스크롤 가능한 폼 영역 */}
-        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-4 pt-2 space-y-4">
-          {error && (
-            <div className="px-3 py-2 rounded-lg bg-red-50 text-sm text-red-600">{error}</div>
-          )}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1.5">연락처</label>
+          <input
+            type="tel"
+            value={customerPhone}
+            onChange={(e) => setCustomerPhone(e.target.value)}
+            placeholder="010-0000-0000"
+            className="w-full h-11 px-3 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors"
+          />
+        </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">
-              고객명 <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="text"
-              value={customerName}
-              onChange={(e) => setCustomerName(e.target.value)}
-              placeholder="고객 이름"
-              className="w-full h-11 px-3 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors"
-              autoFocus
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">연락처</label>
-            <input
-              type="tel"
-              value={customerPhone}
-              onChange={(e) => setCustomerPhone(e.target.value)}
-              placeholder="010-0000-0000"
-              className="w-full h-11 px-3 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">
-              소요 시간 <span className="text-red-500">*</span>
-            </label>
-            <div className="flex flex-wrap gap-2">
-              {DURATION_OPTIONS.map((opt) => {
-                const disabled = opt.value === 0
-                  ? hasAnyReservation // 종일은 다른 예약이 있으면 불가
-                  : opt.value > maxDuration;
-                return (
-                  <button
-                    key={opt.value}
-                    type="button"
-                    onClick={() => !disabled && setDuration(opt.value)}
-                    disabled={disabled}
-                    className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
-                      duration === opt.value
-                        ? 'bg-indigo-500 text-white'
-                        : disabled
-                          ? 'bg-gray-50 text-gray-300 cursor-not-allowed'
-                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                    }`}
-                  >
-                    {opt.label}
-                  </button>
-                );
-              })}
-            </div>
-            {occupiedSlots.length > 1 && (
-              <p className="text-xs text-gray-400 mt-1.5">
-                {occupiedSlots[0]} ~ {occupiedSlots[occupiedSlots.length - 1]} ({occupiedSlots.length}시간)
-              </p>
-            )}
-            {maxDuration < ALL_TIME_SLOTS.length - startIdx && maxDuration > 0 && (
-              <p className="text-xs text-amber-500 mt-1">
-                다음 예약까지 최대 {maxDuration}시간 가능
-              </p>
-            )}
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">
-              상담 유형 <span className="text-red-500">*</span>
-            </label>
-            <div className="flex flex-wrap gap-2">
-              {consultationTypes.map((type) => (
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1.5">
+            소요 시간 <span className="text-red-500">*</span>
+          </label>
+          <div className="flex flex-wrap gap-2">
+            {DURATION_OPTIONS.map((opt) => {
+              const disabled = opt.value === 0
+                ? hasAnyReservation
+                : opt.value > maxDuration;
+              return (
                 <button
-                  key={type}
+                  key={opt.value}
                   type="button"
-                  onClick={() => setConsultationType(type)}
+                  onClick={() => !disabled && setDuration(opt.value)}
+                  disabled={disabled}
                   className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
-                    consultationType === type
+                    duration === opt.value
                       ? 'bg-indigo-500 text-white'
-                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                      : disabled
+                        ? 'bg-gray-50 text-gray-300 cursor-not-allowed'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                   }`}
                 >
-                  {type}
+                  {opt.label}
                 </button>
-              ))}
-            </div>
+              );
+            })}
           </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">메모</label>
-            <textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="예약 관련 메모"
-              rows={2}
-              className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors"
-            />
-          </div>
-
-          {/* 스크롤 영역 하단 여백 */}
-          <div className="pb-2" />
-        </form>
-
-        {/* 하단 고정 버튼 */}
-        <div className="flex-shrink-0 p-4 pt-2 border-t border-gray-100">
-          <button
-            type="button"
-            onClick={handleSubmit}
-            disabled={isSubmitting || !customerName.trim()}
-            className="w-full h-12 rounded-xl bg-indigo-500 text-white text-sm font-semibold hover:bg-indigo-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-          >
-            {isSubmitting ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                등록 중...
-              </>
-            ) : (
-              '예약 등록'
-            )}
-          </button>
+          {occupiedSlots.length > 1 && (
+            <p className="text-xs text-gray-400 mt-1.5">
+              {occupiedSlots[0]} ~ {occupiedSlots[occupiedSlots.length - 1]} ({occupiedSlots.length}시간)
+            </p>
+          )}
+          {maxDuration < ALL_TIME_SLOTS.length - startIdx && maxDuration > 0 && (
+            <p className="text-xs text-amber-500 mt-1">
+              다음 예약까지 최대 {maxDuration}시간 가능
+            </p>
+          )}
         </div>
-      </div>
-    </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1.5">
+            상담 유형 <span className="text-red-500">*</span>
+          </label>
+          <div className="flex flex-wrap gap-2">
+            {consultationTypes.map((type) => (
+              <button
+                key={type}
+                type="button"
+                onClick={() => setConsultationType(type)}
+                className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                  consultationType === type
+                    ? 'bg-indigo-500 text-white'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+              >
+                {type}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1.5">메모</label>
+          <textarea
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            placeholder="예약 관련 메모"
+            rows={2}
+            className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors"
+          />
+        </div>
+      </form>
+    </BaseModal>
   );
 }
