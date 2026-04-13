@@ -12,6 +12,8 @@ export const ROUTES = {
   USER_RESERVE: '/reserve',
   USER_RESERVATIONS: '/reservations',
   USER_PROFILE: '/profile',
+  USER_PRAYER: '/prayer',
+  USER_PRAYER_APPLY: '/prayer/apply',
   USER_CHAT: '/chat',
   USER_CHAT_ROOM: (roomId: string) => `/chat/${roomId}`,
 
@@ -24,6 +26,7 @@ export const ROUTES = {
   MASTER_JOIN_CODES: '/join-codes',
   MASTER_MYPAGE: '/master-mypage',
   MASTER_PROFILE: '/master-profile',
+  MASTER_PRAYER: '/prayer-manage',
   MASTER_CHAT: '/master-chat',
   MASTER_CHAT_ROOM: (roomId: string) => `/master-chat/${roomId}`,
 

@@ -89,7 +89,7 @@ export default function ProfilePage() {
       <div className="max-w-lg mx-auto">
         {/* Page Header */}
         <div className="mb-8">
-          <h1 className="text-2xl font-bold text-gray-900 mb-1">내 프로필</h1>
+          <h1 className="text-2xl font-bold text-gray-900 mb-1">내 정보</h1>
           <p className="text-sm text-gray-500">회원 정보를 확인하고 수정하세요</p>
         </div>
 

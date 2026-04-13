@@ -55,6 +55,9 @@ export type Database = {
 
           address: string
           base_price: number
+          bank_name: string
+          account_number: string
+          account_holder: string
           status: 'pending' | 'approved' | 'rejected' | 'suspended'
           images: string[]
           latitude: number | null
@@ -73,6 +76,9 @@ export type Database = {
 
           address?: string
           base_price?: number
+          bank_name?: string
+          account_number?: string
+          account_holder?: string
           status?: 'pending' | 'approved' | 'rejected' | 'suspended'
           images?: string[]
           latitude?: number | null
@@ -89,6 +95,9 @@ export type Database = {
 
           address?: string
           base_price?: number
+          bank_name?: string
+          account_number?: string
+          account_holder?: string
           status?: 'pending' | 'approved' | 'rejected' | 'suspended'
           images?: string[]
           latitude?: number | null
@@ -388,6 +397,149 @@ export type Database = {
             columns: ['sender_id']
             isOneToOne: false
             referencedRelation: 'users'
+            referencedColumns: ['id']
+          }
+        ]
+      }
+      prayer_products: {
+        Row: {
+          id: string
+          master_id: string
+          category: string
+          name: string
+          description: string
+          is_active: boolean
+          sort_order: number
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          master_id: string
+          category?: string
+          name: string
+          description?: string
+          is_active?: boolean
+          sort_order?: number
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          category?: string
+          name?: string
+          description?: string
+          is_active?: boolean
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'prayer_products_master_id_fkey'
+            columns: ['master_id']
+            isOneToOne: false
+            referencedRelation: 'masters'
+            referencedColumns: ['id']
+          }
+        ]
+      }
+      prayer_product_options: {
+        Row: {
+          id: string
+          product_id: string
+          duration_days: number
+          price: number
+          is_active: boolean
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          product_id: string
+          duration_days: number
+          price?: number
+          is_active?: boolean
+          created_at?: string
+        }
+        Update: {
+          price?: number
+          is_active?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'prayer_product_options_product_id_fkey'
+            columns: ['product_id']
+            isOneToOne: false
+            referencedRelation: 'prayer_products'
+            referencedColumns: ['id']
+          }
+        ]
+      }
+      prayer_orders: {
+        Row: {
+          id: string
+          master_id: string
+          user_id: string | null
+          product_id: string
+          option_id: string | null
+          category: string
+          product_name: string
+          duration_days: number
+          price: number
+          beneficiary_name: string
+          wish_text: string
+          start_date: string
+          end_date: string
+          status: string
+          source: string
+          manual_customer_name: string | null
+          manual_customer_phone: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          master_id: string
+          user_id?: string | null
+          product_id: string
+          option_id?: string | null
+          category?: string
+          product_name: string
+          duration_days: number
+          price?: number
+          beneficiary_name?: string
+          wish_text?: string
+          start_date: string
+          end_date: string
+          status?: string
+          source?: string
+          manual_customer_name?: string | null
+          manual_customer_phone?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'prayer_orders_master_id_fkey'
+            columns: ['master_id']
+            isOneToOne: false
+            referencedRelation: 'masters'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'prayer_orders_user_id_fkey'
+            columns: ['user_id']
+            isOneToOne: false
+            referencedRelation: 'users'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'prayer_orders_product_id_fkey'
+            columns: ['product_id']
+            isOneToOne: false
+            referencedRelation: 'prayer_products'
             referencedColumns: ['id']
           }
         ]

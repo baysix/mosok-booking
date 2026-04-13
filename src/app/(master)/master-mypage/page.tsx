@@ -15,10 +15,12 @@ import {
   FileText,
   Shield,
   HelpCircle,
+  Flame,
 } from 'lucide-react';
 
 const SERVICE_MENU = [
-  { href: ROUTES.MASTER_PROFILE, label: '내 프로필', desc: '프로필 정보 수정 및 미리보기', icon: User },
+  { href: ROUTES.MASTER_PROFILE, label: '내 점집', desc: '점집 정보 수정 및 미리보기', icon: User },
+  { href: ROUTES.MASTER_PRAYER, label: '기원 서비스 관리', desc: '등/초 기원 상품 및 주문 관리', icon: Flame },
   { href: ROUTES.MASTER_SCHEDULE, label: '영업시간 설정', desc: '상담 가능 시간 및 휴무일', icon: History },
 ];
 

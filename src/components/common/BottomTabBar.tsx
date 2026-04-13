@@ -2,12 +2,13 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, Calendar, MessageSquare, User } from 'lucide-react';
+import { Home, Calendar, Flame, MessageSquare, User } from 'lucide-react';
 import { ROUTES } from '@/constants/routes';
 
 const tabs = [
   { href: ROUTES.USER_HOME, label: '홈', icon: Home },
   { href: ROUTES.USER_RESERVATIONS, label: '예약내역', icon: Calendar },
+  { href: ROUTES.USER_PRAYER, label: '기원', icon: Flame },
   { href: ROUTES.USER_CHAT, label: '채팅', icon: MessageSquare },
   { href: ROUTES.USER_PROFILE, label: '프로필', icon: User },
 ];

@@ -5,6 +5,7 @@ import { ChatRoom, Message } from '@/types/chat.types';
 import { Membership } from '@/types/membership.types';
 import { JoinCode } from '@/types/join-code.types';
 import { Notification } from '@/types/notification.types';
+import { PrayerProduct, PrayerProductOption, PrayerOrder } from '@/types/prayer.types';
 
 type UserRow = Database['public']['Tables']['users']['Row'];
 type MasterRow = Database['public']['Tables']['masters']['Row'];
@@ -14,6 +15,9 @@ type MessageRow = Database['public']['Tables']['messages']['Row'];
 type MembershipRow = Database['public']['Tables']['master_memberships']['Row'];
 type JoinCodeRow = Database['public']['Tables']['join_codes']['Row'];
 type NotificationRow = Database['public']['Tables']['notifications']['Row'];
+type PrayerProductRow = Database['public']['Tables']['prayer_products']['Row'];
+type PrayerProductOptionRow = Database['public']['Tables']['prayer_product_options']['Row'];
+type PrayerOrderRow = Database['public']['Tables']['prayer_orders']['Row'];
 
 // User row → User (without password)
 export function mapProfileToUser(row: UserRow) {
@@ -40,6 +44,9 @@ export function mapMasterRow(row: MasterRow): MasterProfile {
     region: row.region,
     address: row.address,
     basePrice: row.base_price,
+    bankName: row.bank_name,
+    accountNumber: row.account_number,
+    accountHolder: row.account_holder,
     status: row.status,
     images: row.images,
     latitude: row.latitude,
@@ -138,5 +145,58 @@ export function mapNotificationRow(row: NotificationRow): Notification {
     body: row.body,
     isRead: row.is_read,
     createdAt: row.created_at,
+  };
+}
+
+// PrayerProduct row → PrayerProduct (options loaded separately)
+export function mapPrayerProductRow(row: PrayerProductRow, options: PrayerProductOption[] = []): Omit<PrayerProduct, 'options'> & { options: PrayerProductOption[] } {
+  return {
+    id: row.id,
+    masterId: row.master_id,
+    category: row.category,
+    name: row.name,
+    description: row.description,
+    isActive: row.is_active,
+    sortOrder: row.sort_order,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    options,
+  };
+}
+
+// PrayerProductOption row → PrayerProductOption
+export function mapPrayerProductOptionRow(row: PrayerProductOptionRow): PrayerProductOption {
+  return {
+    id: row.id,
+    productId: row.product_id,
+    durationDays: row.duration_days,
+    price: row.price,
+    isActive: row.is_active,
+    createdAt: row.created_at,
+  };
+}
+
+// PrayerOrder row → PrayerOrder
+export function mapPrayerOrderRow(row: PrayerOrderRow): PrayerOrder {
+  return {
+    id: row.id,
+    masterId: row.master_id,
+    userId: row.user_id,
+    productId: row.product_id,
+    optionId: row.option_id,
+    category: row.category,
+    productName: row.product_name,
+    durationDays: row.duration_days,
+    price: row.price,
+    beneficiaryName: row.beneficiary_name,
+    wishText: row.wish_text,
+    startDate: row.start_date,
+    endDate: row.end_date,
+    status: row.status as PrayerOrder['status'],
+    source: row.source as PrayerOrder['source'],
+    manualCustomerName: row.manual_customer_name ?? undefined,
+    manualCustomerPhone: row.manual_customer_phone ?? undefined,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
   };
 }
