@@ -1,5 +1,12 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+};
 
 export const metadata: Metadata = {
   title: "무속은 안 어려워?",
@@ -13,7 +20,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ko" suppressHydrationWarning>
-      <body className="min-h-screen flex flex-col font-sans antialiased bg-white text-foreground">
+      <body className="min-h-screen flex flex-col font-sans antialiased bg-white text-foreground overflow-x-hidden">
         {children}
       </body>
     </html>
