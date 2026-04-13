@@ -35,7 +35,7 @@ export function Sidebar({ className, onClose }: SidebarProps) {
         { href: ROUTES.USER_RESERVE, label: '예약하기', icon: Calendar },
         { href: ROUTES.USER_RESERVATIONS, label: '내 예약', icon: History },
         { href: ROUTES.USER_CHAT, label: '채팅', icon: MessageSquare },
-        { href: ROUTES.USER_PROFILE, label: '내 프로필', icon: User },
+        { href: ROUTES.USER_PROFILE, label: '내 정보', icon: User },
     ];
 
     const masterLinks = [
@@ -46,7 +46,7 @@ export function Sidebar({ className, onClose }: SidebarProps) {
         { href: ROUTES.MASTER_MEMBERS, label: '회원 관리', icon: Users },
         { href: ROUTES.MASTER_JOIN_CODES, label: '초대코드', icon: KeyRound },
         { href: ROUTES.MASTER_CHAT, label: '채팅', icon: MessageSquare },
-        { href: ROUTES.MASTER_PROFILE, label: '내 프로필', icon: User },
+        { href: ROUTES.MASTER_PROFILE, label: '내 점집', icon: User },
     ];
 
     const adminLinks = [
@@ -105,7 +105,7 @@ export function Sidebar({ className, onClose }: SidebarProps) {
                     </div>
                     <div className="flex-1 overflow-hidden">
                         <p className="text-sm font-medium truncate">{user.fullName}</p>
-                        <p className="text-xs text-muted-foreground truncate">내 프로필</p>
+                        <p className="text-xs text-muted-foreground truncate">내 정보</p>
                     </div>
                 </Link>
                 <Button variant="outline" className="w-full justify-start text-muted-foreground hover:text-destructive" onClick={() => {

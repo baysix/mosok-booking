@@ -23,6 +23,7 @@ import {
   DURATION_OPTIONS,
 } from '@/types/reservation.types';
 import { Specialty } from '@/types/master.types';
+import { getMyMasterProfile } from '@/services/master.service';
 import { DAY_LABELS } from '@/types/schedule.types';
 import {
   Clock,
@@ -36,7 +37,7 @@ import {
   Loader2,
 } from 'lucide-react';
 
-const CONSULTATION_TYPES: Specialty[] = ['굿', '점술', '사주', '타로', '궁합', '작명', '풍수', '해몽'];
+const DEFAULT_CONSULTATION_TYPES: Specialty[] = ['굿', '점술', '사주', '타로', '궁합', '작명', '풍수', '해몽'];
 
 export default function MasterCalendarPage() {
   const router = useRouter();
@@ -59,6 +60,7 @@ export default function MasterCalendarPage() {
   // Manual reservation modal
   const [modalOpen, setModalOpen] = useState(false);
   const [modalTimeSlot, setModalTimeSlot] = useState<TimeSlot>('09:00');
+  const [masterSpecialties, setMasterSpecialties] = useState<Specialty[]>([]);
 
   // Auth guard
   useEffect(() => {
@@ -66,6 +68,17 @@ export default function MasterCalendarPage() {
       router.push('/');
     }
   }, [user, authLoading, router]);
+
+  // Fetch master specialties
+  useEffect(() => {
+    if (user?.role === 'master') {
+      getMyMasterProfile().then((profile) => {
+        if (profile && profile.specialties.length > 0) {
+          setMasterSpecialties(profile.specialties);
+        }
+      }).catch(() => {});
+    }
+  }, [user]);
 
   // Fetch calendar data
   const fetchCalendar = useCallback(async () => {
@@ -458,6 +471,8 @@ export default function MasterCalendarPage() {
             onClose={() => setModalOpen(false)}
             date={selectedDate}
             timeSlot={modalTimeSlot}
+            consultationTypes={masterSpecialties.length > 0 ? masterSpecialties : DEFAULT_CONSULTATION_TYPES}
+            existingReservations={dayReservations}
             onSubmit={handleManualSubmit}
           />
         )}
@@ -473,6 +488,8 @@ interface ManualReservationModalProps {
   onClose: () => void;
   date: string;
   timeSlot: TimeSlot;
+  consultationTypes: Specialty[];
+  existingReservations: ReservationWithUser[];
   onSubmit: (data: CreateManualReservationData) => Promise<void>;
 }
 
@@ -481,14 +498,15 @@ function ManualReservationModal({
   onClose,
   date,
   timeSlot,
+  consultationTypes,
+  existingReservations,
   onSubmit,
 }: ManualReservationModalProps) {
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
-  const [consultationType, setConsultationType] = useState<Specialty>('사주');
+  const [consultationType, setConsultationType] = useState<Specialty>(consultationTypes[0] || '사주');
   const [duration, setDuration] = useState(1);
   const [notes, setNotes] = useState('');
-  const [totalPrice, setTotalPrice] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
 
@@ -508,12 +526,32 @@ function ManualReservationModal({
     return `${Number(m)}월 ${Number(d)}일 (${dayOfWeek})`;
   })();
 
+  // 기존 예약의 점유 슬롯 계산 (취소/거절 제외)
+  const activeReservations = existingReservations.filter(
+    r => r.status !== 'cancelled' && r.status !== 'rejected'
+  );
+  const occupiedSlotSet = new Set<string>();
+  for (const r of activeReservations) {
+    const slots = getOccupiedSlots(r.timeSlot, r.duration || 1);
+    slots.forEach(s => occupiedSlotSet.add(s));
+  }
+
+  const startIdx = ALL_TIME_SLOTS.indexOf(timeSlot);
+
+  // 선택한 시간부터 연속으로 비어있는 슬롯 수 계산
+  let maxFreeSlots = 0;
+  for (let i = startIdx; i < ALL_TIME_SLOTS.length; i++) {
+    if (occupiedSlotSet.has(ALL_TIME_SLOTS[i])) break;
+    maxFreeSlots++;
+  }
+
+  const maxDuration = maxFreeSlots;
+  const hasAnyReservation = activeReservations.length > 0;
+
   const isFullDay = duration === 0;
   const displayTimeSlot = isFullDay ? '종일 (09:00~23:00)' : timeSlot;
   const startSlot = isFullDay ? ALL_TIME_SLOTS[0] : timeSlot;
   const occupiedSlots = getOccupiedSlots(startSlot, isFullDay ? ALL_TIME_SLOTS.length : duration);
-  const startIdx = ALL_TIME_SLOTS.indexOf(timeSlot);
-  const maxFromStart = ALL_TIME_SLOTS.length - startIdx;
 
   const handleSubmit = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -534,14 +572,12 @@ function ManualReservationModal({
         customerName: customerName.trim(),
         customerPhone: customerPhone.trim() || undefined,
         notes: notes.trim() || undefined,
-        totalPrice: totalPrice ? Number(totalPrice) : undefined,
       });
       setCustomerName('');
       setCustomerPhone('');
-      setConsultationType('사주');
+      setConsultationType(consultationTypes[0] || '사주');
       setDuration(1);
       setNotes('');
-      setTotalPrice('');
       onClose();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : '예약 등록에 실패했습니다');
@@ -613,7 +649,9 @@ function ManualReservationModal({
             </label>
             <div className="flex flex-wrap gap-2">
               {DURATION_OPTIONS.map((opt) => {
-                const disabled = opt.value !== 0 && opt.value > maxFromStart;
+                const disabled = opt.value === 0
+                  ? hasAnyReservation // 종일은 다른 예약이 있으면 불가
+                  : opt.value > maxDuration;
                 return (
                   <button
                     key={opt.value}
@@ -638,6 +676,11 @@ function ManualReservationModal({
                 {occupiedSlots[0]} ~ {occupiedSlots[occupiedSlots.length - 1]} ({occupiedSlots.length}시간)
               </p>
             )}
+            {maxDuration < ALL_TIME_SLOTS.length - startIdx && maxDuration > 0 && (
+              <p className="text-xs text-amber-500 mt-1">
+                다음 예약까지 최대 {maxDuration}시간 가능
+              </p>
+            )}
           </div>
 
           <div>
@@ -645,7 +688,7 @@ function ManualReservationModal({
               상담 유형 <span className="text-red-500">*</span>
             </label>
             <div className="flex flex-wrap gap-2">
-              {CONSULTATION_TYPES.map((type) => (
+              {consultationTypes.map((type) => (
                 <button
                   key={type}
                   type="button"
@@ -659,20 +702,6 @@ function ManualReservationModal({
                   {type}
                 </button>
               ))}
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">상담료</label>
-            <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-400">₩</span>
-              <input
-                type="number"
-                value={totalPrice}
-                onChange={(e) => setTotalPrice(e.target.value)}
-                placeholder="0"
-                className="w-full h-11 pl-8 pr-3 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors"
-              />
             </div>
           </div>
 

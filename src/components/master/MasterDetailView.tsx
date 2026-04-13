@@ -294,7 +294,7 @@ export function MasterDetailView({ master, action, hasBottomTab = false }: Maste
                         </span>
                         <span className="text-base text-gray-500">원~</span>
                       </div>
-                      <p className="text-xs text-gray-400 mt-1">기본 상담료 기준</p>
+                      <p className="text-xs text-gray-400 mt-1">기본 예약금 기준</p>
                     </div>
                     <div className="h-px bg-gray-100" />
                   </>

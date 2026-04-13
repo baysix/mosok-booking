@@ -64,6 +64,9 @@ export async function updateMasterProfile(
     region?: string;
     address?: string;
     basePrice?: number;
+    bankName?: string;
+    accountNumber?: string;
+    accountHolder?: string;
     images?: string[];
     latitude?: number | null;
     longitude?: number | null;
@@ -78,6 +81,9 @@ export async function updateMasterProfile(
   if (updates.region !== undefined) updateData.region = updates.region;
   if (updates.address !== undefined) updateData.address = updates.address;
   if (updates.basePrice !== undefined) updateData.base_price = updates.basePrice;
+  if (updates.bankName !== undefined) updateData.bank_name = updates.bankName;
+  if (updates.accountNumber !== undefined) updateData.account_number = updates.accountNumber;
+  if (updates.accountHolder !== undefined) updateData.account_holder = updates.accountHolder;
   if (updates.images !== undefined) updateData.images = updates.images;
   if (updates.latitude !== undefined) updateData.latitude = updates.latitude;
   if (updates.longitude !== undefined) updateData.longitude = updates.longitude;
@@ -102,6 +108,9 @@ export async function createMasterProfile(data: {
   region?: string;
   address?: string;
   basePrice?: number;
+  bankName?: string;
+  accountNumber?: string;
+  accountHolder?: string;
   images?: string[];
   latitude?: number | null;
   longitude?: number | null;
@@ -118,6 +127,9 @@ export async function createMasterProfile(data: {
       region: data.region || '',
       address: data.address || '',
       base_price: data.basePrice || 0,
+      bank_name: data.bankName || '',
+      account_number: data.accountNumber || '',
+      account_holder: data.accountHolder || '',
       images: data.images || [],
       latitude: data.latitude ?? null,
       longitude: data.longitude ?? null,

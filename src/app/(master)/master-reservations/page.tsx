@@ -147,13 +147,7 @@ export default function MasterReservationsPage() {
             <h1 className="text-2xl font-bold text-gray-900 mb-1">예약 관리</h1>
             <p className="text-sm text-gray-500">고객 예약을 확인하고 관리하세요</p>
           </div>
-          <button
-            onClick={() => setModalOpen(true)}
-            className="flex items-center gap-1.5 px-4 py-2.5 bg-indigo-500 text-white text-sm font-semibold rounded-xl hover:bg-indigo-600 transition-colors"
-          >
-            <Plus className="w-4 h-4" />
-            수동 예약
-          </button>
+          {/* 수동 예약은 캘린더에서만 가능 */}
         </div>
 
         {/* Status Tabs */}

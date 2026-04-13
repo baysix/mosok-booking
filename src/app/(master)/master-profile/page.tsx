@@ -19,6 +19,7 @@ import {
   Search,
   MapPin,
   X,
+  Plus,
 } from 'lucide-react';
 
 const STATUS_CONFIG: Record<MasterStatus, { label: string; icon: React.ElementType; className: string }> = {
@@ -43,10 +44,14 @@ export default function MasterProfilePage() {
   const [specialties, setSpecialties] = useState<Specialty[]>([]);
   const [yearsExperience, setYearsExperience] = useState('');
   const [basePrice, setBasePrice] = useState('');
+  const [bankName, setBankName] = useState('');
+  const [accountNumber, setAccountNumber] = useState('');
+  const [accountHolder, setAccountHolder] = useState('');
   const [region, setRegion] = useState('');
   const [detailAddress, setDetailAddress] = useState('');
   const [coords, setCoords] = useState<{ latitude: number; longitude: number } | null>(null);
   const [images, setImages] = useState<string[]>([]);
+  const [customSpecialty, setCustomSpecialty] = useState('');
   const [showPostcode, setShowPostcode] = useState(false);
 
   // 모달 열릴 때 배경 스크롤 차단
@@ -78,6 +83,9 @@ export default function MasterProfilePage() {
         setSpecialties(data.specialties);
         setYearsExperience(String(data.yearsExperience));
         setBasePrice(String(data.basePrice));
+        setBankName(data.bankName || '');
+        setAccountNumber(data.accountNumber || '');
+        setAccountHolder(data.accountHolder || '');
         setRegion(data.region);
         setDetailAddress(data.address);
         setImages(data.images);
@@ -130,6 +138,21 @@ export default function MasterProfilePage() {
     );
   };
 
+  const addCustomSpecialty = () => {
+    const trimmed = customSpecialty.trim();
+    if (!trimmed) return;
+    if (specialties.includes(trimmed)) {
+      setCustomSpecialty('');
+      return;
+    }
+    setSpecialties((prev) => [...prev, trimmed]);
+    setCustomSpecialty('');
+  };
+
+  const removeSpecialty = (specialty: string) => {
+    setSpecialties((prev) => prev.filter((s) => s !== specialty));
+  };
+
   const handleSave = async () => {
     if (!businessName.trim()) {
       setMessage({ type: 'error', text: '상호명을 입력해주세요' });
@@ -144,6 +167,9 @@ export default function MasterProfilePage() {
         specialties,
         yearsExperience: yearsExperience ? Number(yearsExperience) : 0,
         basePrice: basePrice ? Number(basePrice) : 0,
+        bankName: bankName.trim(),
+        accountNumber: accountNumber.trim(),
+        accountHolder: accountHolder.trim(),
         region,
         address: detailAddress.trim(),
         images,
@@ -185,8 +211,8 @@ export default function MasterProfilePage() {
       <div className="container mx-auto px-4 py-6 max-w-3xl">
         <div className="flex items-center justify-between mb-5">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900 mb-1">내 프로필</h1>
-            <p className="text-sm text-gray-500">무속인 프로필 정보를 관리하세요</p>
+            <h1 className="text-2xl font-bold text-gray-900 mb-1">내 점집 수정</h1>
+            <p className="text-sm text-gray-500">점집 정보를 관리하세요</p>
           </div>
           <button
             onClick={() => router.push('/master-profile/preview')}
@@ -196,16 +222,23 @@ export default function MasterProfilePage() {
           </button>
         </div>
 
-        {/* Message toast */}
+        {/* Snackbar toast */}
         {message && (
-          <div
-            className={`mb-4 px-4 py-3 rounded-xl text-sm font-medium ${
-              message.type === 'success'
-                ? 'bg-green-50 text-green-700 border border-green-200'
-                : 'bg-red-50 text-red-700 border border-red-200'
-            }`}
-          >
-            {message.text}
+          <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[70] animate-in fade-in slide-in-from-bottom-4 duration-300">
+            <div
+              className={`px-5 py-3 rounded-2xl text-sm font-medium shadow-lg flex items-center gap-2 ${
+                message.type === 'success'
+                  ? 'bg-gray-900 text-white'
+                  : 'bg-red-500 text-white'
+              }`}
+            >
+              {message.type === 'success' ? (
+                <CheckCircle className="w-4 h-4 flex-shrink-0" />
+              ) : (
+                <AlertCircle className="w-4 h-4 flex-shrink-0" />
+              )}
+              {message.text}
+            </div>
           </div>
         )}
 
@@ -271,6 +304,52 @@ export default function MasterProfilePage() {
                 );
               })}
             </div>
+
+            {/* Custom specialty input */}
+            <div className="flex gap-2 mt-3">
+              <input
+                type="text"
+                value={customSpecialty}
+                onChange={(e) => setCustomSpecialty(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    addCustomSpecialty();
+                  }
+                }}
+                placeholder="직접 입력하세요"
+                className="flex-1 h-10 px-3 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors"
+              />
+              <button
+                type="button"
+                onClick={addCustomSpecialty}
+                className="h-10 px-4 rounded-xl bg-indigo-500 text-white text-sm font-medium hover:bg-indigo-600 active:scale-95 transition-all flex items-center gap-1"
+              >
+                <Plus className="w-4 h-4" />
+                추가
+              </button>
+            </div>
+
+            {/* Selected specialties tags */}
+            {specialties.length > 0 && (
+              <div className="flex flex-wrap gap-2 mt-3">
+                {specialties.map((s) => (
+                  <span
+                    key={s}
+                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-indigo-50 text-indigo-700 text-sm font-medium border border-indigo-100"
+                  >
+                    {s}
+                    <button
+                      type="button"
+                      onClick={() => removeSpecialty(s)}
+                      className="p-0.5 rounded-full hover:bg-indigo-200 transition-colors"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Years Experience */}
@@ -291,7 +370,7 @@ export default function MasterProfilePage() {
           {/* Base Price */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1.5">
-              기본 상담료
+              기본 예약금
             </label>
             <div className="relative">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-400">₩</span>
@@ -302,6 +381,37 @@ export default function MasterProfilePage() {
                 placeholder="0"
                 min="0"
                 className="w-full h-11 pl-8 pr-3 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors"
+              />
+            </div>
+          </div>
+
+          {/* Bank Account */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">
+              입금 계좌
+            </label>
+            <p className="text-xs text-gray-400 mb-2">예약금 입금을 받을 계좌 정보를 입력하세요</p>
+            <div className="space-y-2">
+              <input
+                type="text"
+                value={bankName}
+                onChange={(e) => setBankName(e.target.value)}
+                placeholder="은행명 (예: 국민은행)"
+                className="w-full h-11 px-3 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors"
+              />
+              <input
+                type="text"
+                value={accountNumber}
+                onChange={(e) => setAccountNumber(e.target.value)}
+                placeholder="계좌번호"
+                className="w-full h-11 px-3 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors"
+              />
+              <input
+                type="text"
+                value={accountHolder}
+                onChange={(e) => setAccountHolder(e.target.value)}
+                placeholder="예금주"
+                className="w-full h-11 px-3 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors"
               />
             </div>
           </div>

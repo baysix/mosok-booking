@@ -1,0 +1,5 @@
+-- 무속인 계좌 정보 추가 (예약금 입금용)
+ALTER TABLE masters
+  ADD COLUMN IF NOT EXISTS bank_name TEXT NOT NULL DEFAULT '',
+  ADD COLUMN IF NOT EXISTS account_number TEXT NOT NULL DEFAULT '',
+  ADD COLUMN IF NOT EXISTS account_holder TEXT NOT NULL DEFAULT '';

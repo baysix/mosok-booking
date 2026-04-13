@@ -1,6 +1,6 @@
 export type MasterStatus = 'pending' | 'approved' | 'rejected' | 'suspended';
 
-export type Specialty = '굿' | '점술' | '사주' | '타로' | '궁합' | '작명' | '풍수' | '해몽';
+export type Specialty = string;
 
 export interface MasterProfile {
   id: string;
@@ -12,6 +12,9 @@ export interface MasterProfile {
   region: string;
   address: string;
   basePrice: number;
+  bankName: string;
+  accountNumber: string;
+  accountHolder: string;
   status: MasterStatus;
   images: string[];
   latitude: number | null;

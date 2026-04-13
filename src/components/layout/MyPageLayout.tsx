@@ -21,7 +21,7 @@ const MASTER_MENU = [
   { href: ROUTES.MASTER_SCHEDULE, label: '영업시간 설정', icon: History },
   { href: ROUTES.MASTER_MEMBERS, label: '회원 관리', icon: Users },
   { href: ROUTES.MASTER_JOIN_CODES, label: '초대코드', icon: KeyRound },
-  { href: ROUTES.MASTER_PROFILE, label: '내 프로필', icon: User },
+  { href: ROUTES.MASTER_PROFILE, label: '내 점집', icon: User },
 ];
 
 interface MyPageLayoutProps {

@@ -220,7 +220,7 @@ export function Header() {
                     className="px-4 py-3 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
                     onClick={() => setIsMobileMenuOpen(false)}
                   >
-                    내 프로필
+                    내 점집
                   </Link>
                   <div className="h-px bg-gray-100 my-2" />
                   <div className="px-4 py-2 text-sm text-gray-500">
@@ -284,7 +284,7 @@ export function Header() {
                     className="px-4 py-3 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
                     onClick={() => setIsMobileMenuOpen(false)}
                   >
-                    내 프로필
+                    내 정보
                   </Link>
                   <div className="h-px bg-gray-100 my-2" />
                   <div className="px-4 py-2 text-sm text-gray-500">

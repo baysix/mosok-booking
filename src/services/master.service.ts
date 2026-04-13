@@ -24,6 +24,9 @@ export async function updateMyMasterProfile(updates: {
   region?: string;
   address?: string;
   basePrice?: number;
+  bankName?: string;
+  accountNumber?: string;
+  accountHolder?: string;
   images?: string[];
   latitude?: number | null;
   longitude?: number | null;
