@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { verifyToken } from '@/lib/auth/jwt';
+import { verifyToken, createToken } from '@/lib/auth/jwt';
 
 // 인증 필요 라우트
 const protectedRoutes = [
@@ -118,7 +118,31 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  return NextResponse.next();
+  // 세션 갱신: 만료까지 6일 미만 남았을 때만 7일로 재연장 (하루 1회 수준)
+  const response = NextResponse.next();
+  if (user) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const exp = (user as any).exp as number | undefined;
+    const sixDaysInSec = 60 * 60 * 24 * 6;
+    const needsRenewal = !exp || exp - Date.now() / 1000 < sixDaysInSec;
+
+    if (needsRenewal) {
+      const newToken = await createToken({
+        userId: user.userId,
+        email: user.email,
+        role: user.role,
+        ...(user.masterId && { masterId: user.masterId }),
+      });
+      response.cookies.set('auth-token', newToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: 60 * 60 * 24 * 7,
+        path: '/',
+      });
+    }
+  }
+  return response;
 }
 
 export const config = {

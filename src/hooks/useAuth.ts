@@ -7,11 +7,16 @@ import { LoginCredentials, SignupData } from '@/types/auth.types';
 import { ROUTES } from '@/constants/routes';
 
 export function useAuth() {
-  const { user, masterId, isLoading, setUser, setMasterId, setLoading, logout: storeLogout } = useAuthStore();
+  const {
+    user, masterId, isLoading, initialized,
+    setUser, setMasterId, setLoading, setInitialized, logout: storeLogout,
+  } = useAuthStore();
   const router = useRouter();
 
-  // 초기 로드 시 사용자 정보 가져오기
+  // 최초 1회만 /api/auth/me 호출 (initialized 플래그로 중복 방지)
   useEffect(() => {
+    if (initialized) return;
+
     async function fetchUser() {
       try {
         const response = await fetch('/api/auth/me');
@@ -27,11 +32,13 @@ export function useAuth() {
         console.error('Failed to fetch user:', error);
         setUser(null);
         setMasterId(null);
+      } finally {
+        setInitialized();
       }
     }
 
     fetchUser();
-  }, [setUser, setMasterId]);
+  }, [initialized, setUser, setMasterId, setInitialized]);
 
   // 역할에 따른 리다이렉트 경로
   const getRedirectPath = (role: string, hasMasterId: boolean) => {
