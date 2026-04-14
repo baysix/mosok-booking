@@ -10,6 +10,8 @@ import ChatInput from '@/components/chat/ChatInput';
 import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { ROUTES } from '@/constants/routes';
+import { createClient } from '@/lib/supabase/client';
+import { mapMessageRow } from '@/lib/supabase/mappers';
 
 export default function MasterChatRoomPage() {
   const params = useParams();
@@ -22,7 +24,6 @@ export default function MasterChatRoomPage() {
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const pollRef = useRef<NodeJS.Timeout | null>(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -62,13 +63,34 @@ export default function MasterChatRoomPage() {
     scrollToBottom();
   }, [messages]);
 
-  // Poll for new messages
+  // Supabase Realtime — messages INSERT 구독 (폴링 대체)
   useEffect(() => {
-    pollRef.current = setInterval(fetchMessages, 5000);
+    if (!roomId) return;
+    const supabase = createClient();
+    const channel = supabase
+      .channel(`master-room:${roomId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'messages',
+          filter: `room_id=eq.${roomId}`,
+        },
+        (payload) => {
+          const newMsg = mapMessageRow(payload.new as Parameters<typeof mapMessageRow>[0]);
+          setMessages((prev) => {
+            if (prev.find((m) => m.id === newMsg.id)) return prev;
+            return [...prev, newMsg];
+          });
+        },
+      )
+      .subscribe();
+
     return () => {
-      if (pollRef.current) clearInterval(pollRef.current);
+      supabase.removeChannel(channel);
     };
-  }, [fetchMessages]);
+  }, [roomId]);
 
   const handleSend = async (content: string) => {
     if (sending) return;
@@ -88,9 +110,9 @@ export default function MasterChatRoomPage() {
   const displayName = room?.otherUser?.businessName || room?.otherUser?.fullName || '채팅';
 
   return (
-    <div className="flex flex-col h-screen bg-gray-50">
+    <div className="flex flex-col h-full bg-gray-50">
       {/* Chat header */}
-      <div className="sticky top-0 z-40 bg-white border-b border-gray-100">
+      <div className="shrink-0 bg-white border-b border-gray-100">
         <div className="flex items-center gap-3 h-14 px-4 max-w-lg mx-auto">
           <Link
             href={ROUTES.MASTER_CHAT}
@@ -120,7 +142,7 @@ export default function MasterChatRoomPage() {
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-4 py-4 max-w-lg mx-auto w-full">
+      <div className="flex-1 min-h-0 overflow-y-auto px-4 py-4 max-w-lg mx-auto w-full">
         {loading ? (
           <div className="flex items-center justify-center h-full">
             <div className="animate-spin w-6 h-6 border-2 border-primary border-t-transparent rounded-full" />
@@ -140,7 +162,7 @@ export default function MasterChatRoomPage() {
       </div>
 
       {/* Input */}
-      <div className="max-w-lg mx-auto w-full">
+      <div className="shrink-0 max-w-lg mx-auto w-full">
         <ChatInput onSend={handleSend} disabled={sending} />
       </div>
     </div>

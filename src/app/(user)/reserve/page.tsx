@@ -61,7 +61,7 @@ export default function ReservePage() {
     async function fetchMaster() {
       try {
         setMasterLoading(true);
-        const response = await fetch(`/api/masters/me`);
+        const response = await fetch(`/api/masters/my-master`);
         if (response.ok) {
           const data = await response.json();
           setMasterInfo(data.master);

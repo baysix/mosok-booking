@@ -14,9 +14,9 @@ export default function UserLayout({
   const { user, logout } = useAuth();
 
   return (
-    <div className="flex min-h-screen flex-col bg-gray-50">
+    <div className="flex h-dvh flex-col bg-gray-50">
       {/* 상단 심플 헤더 */}
-      <header className="sticky top-0 z-40 bg-white border-b border-gray-100">
+      <header className="shrink-0 z-40 bg-white border-b border-gray-100">
         <div className="flex h-14 items-center justify-between px-4 max-w-lg mx-auto">
           <Link href={ROUTES.USER_HOME}>
             <span className="text-lg font-extrabold text-primary">무속</span>
@@ -35,8 +35,8 @@ export default function UserLayout({
         </div>
       </header>
 
-      {/* 메인 컨텐츠 */}
-      <main className="flex-1 pb-20">{children}</main>
+      {/* 메인 컨텐츠 (자체 스크롤) */}
+      <main className="flex-1 min-h-0 overflow-y-auto">{children}</main>
 
       {/* 하단 탭바 */}
       <BottomTabBar />

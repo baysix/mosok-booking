@@ -3,8 +3,9 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
+import { useGetOrCreateRoom } from '@/hooks/queries/useChat';
 import { ROUTES } from '@/constants/routes';
-import { Calendar } from 'lucide-react';
+import { Calendar, MessageCircle } from 'lucide-react';
 import { MasterProfile } from '@/types/master.types';
 import { MasterDetailView } from '@/components/master/MasterDetailView';
 
@@ -13,6 +14,17 @@ export default function UserHomePage() {
   const router = useRouter();
   const [master, setMaster] = useState<(MasterProfile & { user?: { fullName: string } }) | null>(null);
   const [loading, setLoading] = useState(true);
+  const getOrCreateRoom = useGetOrCreateRoom();
+
+  const handleChat = async () => {
+    if (!master) return;
+    try {
+      const room = await getOrCreateRoom.mutateAsync(master.id);
+      router.push(`/chat/${room.id}`);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : '채팅방을 열 수 없습니다');
+    }
+  };
 
   useEffect(() => {
     if (authLoading) return;
@@ -52,13 +64,23 @@ export default function UserHomePage() {
       master={master}
       hasBottomTab
       action={
-        <button
-          onClick={() => router.push(ROUTES.USER_RESERVE)}
-          className="w-full h-12 bg-primary text-white text-sm font-semibold rounded-xl hover:bg-primary/90 transition-colors flex items-center justify-center gap-2 shadow-lg shadow-primary/20"
-        >
-          <Calendar className="w-5 h-5" />
-          예약하기
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={handleChat}
+            disabled={getOrCreateRoom.isPending}
+            aria-label="채팅하기"
+            className="shrink-0 w-12 h-12 bg-white border border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <MessageCircle className="w-5 h-5" />
+          </button>
+          <button
+            onClick={() => router.push(ROUTES.USER_RESERVE)}
+            className="flex-1 h-12 bg-primary text-white text-sm font-semibold rounded-xl hover:bg-primary/90 transition-colors flex items-center justify-center gap-2 shadow-lg shadow-primary/20"
+          >
+            <Calendar className="w-5 h-5" />
+            예약하기
+          </button>
+        </div>
       }
     />
   );

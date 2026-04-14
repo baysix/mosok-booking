@@ -32,13 +32,15 @@ export function useChatRooms(enabled = true) {
   });
 }
 
-/** 채팅 메시지 목록 조회 (5초 폴링으로 실시간 업데이트) */
+/**
+ * 채팅 메시지 목록 초기 조회
+ * 실시간 업데이트는 Supabase Realtime 구독으로 처리 (채팅방 페이지 참조)
+ */
 export function useChatMessages(roomId: string, enabled = true) {
   return useQuery({
     queryKey: chatKeys.messages(roomId),
     queryFn: () => getMessages(roomId),
     enabled: enabled && !!roomId,
-    refetchInterval: 5000, // 5초마다 새 메시지 확인
   });
 }
 

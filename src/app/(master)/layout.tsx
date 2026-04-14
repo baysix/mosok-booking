@@ -14,9 +14,9 @@ export default function MasterLayout({
   const { user, logout } = useAuth();
 
   return (
-    <div className="flex min-h-screen flex-col bg-white">
+    <div className="flex h-dvh flex-col bg-white">
       {/* 상단 심플 헤더 (모바일) */}
-      <header className="lg:hidden sticky top-0 z-40 bg-white border-b border-gray-100">
+      <header className="lg:hidden shrink-0 z-40 bg-white border-b border-gray-100">
         <div className="flex h-14 items-center justify-between px-4 max-w-lg mx-auto">
           <Link href={ROUTES.MASTER_DASHBOARD}>
             <span className="text-lg font-extrabold text-primary">무속</span>
@@ -35,11 +35,11 @@ export default function MasterLayout({
         </div>
       </header>
 
-      {/* 메인 컨텐츠 */}
-      <main className="flex-1 pb-20 lg:pb-0">{children}</main>
+      {/* 메인 컨텐츠 (자체 스크롤) */}
+      <main className="flex-1 min-h-0 overflow-y-auto">{children}</main>
 
       {/* 하단 탭바 (모바일) */}
-      <div className="lg:hidden">
+      <div className="lg:hidden shrink-0">
         <MasterBottomTabBar />
       </div>
     </div>

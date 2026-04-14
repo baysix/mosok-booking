@@ -335,23 +335,22 @@ export function MasterDetailView({ master, action, hasBottomTab = false }: Maste
       {/* Mobile Bottom Bar */}
       {action && (
         <div
-          className={`fixed ${hasBottomTab ? 'bottom-16' : 'bottom-0'} left-0 right-0 bg-white border-t border-gray-100 p-4 lg:hidden z-40`}
-          style={hasBottomTab ? undefined : { paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}
+          className={`fixed ${hasBottomTab ? 'bottom-16' : 'bottom-0'} left-0 right-0 bg-white border-t border-gray-100 px-4 py-3 lg:hidden z-40`}
+          style={hasBottomTab ? undefined : { paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
         >
-          <div className="flex items-center gap-3">
+          <div className="max-w-lg mx-auto space-y-2">
             {master.basePrice > 0 && (
-              <div className="flex-1">
+              <div className="flex items-baseline justify-between">
+                <span className="text-xs text-gray-500">기본 예약금</span>
                 <div className="flex items-baseline gap-1">
-                  <span className="text-xl font-bold text-gray-900">
+                  <span className="text-lg font-bold text-gray-900">
                     {master.basePrice.toLocaleString()}
                   </span>
                   <span className="text-sm text-gray-500">원~</span>
                 </div>
               </div>
             )}
-            <div className={master.basePrice > 0 ? 'flex-1' : 'w-full'}>
-              {action}
-            </div>
+            <div>{action}</div>
           </div>
         </div>
       )}
